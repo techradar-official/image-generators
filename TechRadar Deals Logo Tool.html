@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1920x1080 Logo Overlay Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .controls-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1000px;
+            justify-content: space-between;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .control-group h3 { margin-top: 0; margin-bottom: 5px; font-size: 1.1em;}
+        input[type="text"], input[type="file"], select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 90%;
+            margin: 0 auto;
+            display: block;
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .slider-group input { flex: 1; }
+        
+        .center-controls {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            min-width: 180px;
+        }
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+        .center-controls h4 { margin: 0; font-size: 0.9em; color: #555; text-transform: uppercase; letter-spacing: 1px;}
+        
+        button {
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            width: 100%;
+            font-size: 0.9em;
+        }
+        button:hover { background-color: #004494; }
+        .preset-btn { background-color: #17a2b8; font-size: 1em; padding: 12px;}
+        .preset-btn:hover { background-color: #138496; }
+        .reset-btn { background-color: #6c757d; }
+        .reset-btn:hover { background-color: #5a6268; }
+        .export-btn { background-color: #28a745; font-size: 1.1em; padding: 12px 24px; margin-top: 20px; width: auto;}
+        .export-btn:hover { background-color: #218838; }
+        
+        #colorSelection {
+            display: none; 
+            justify-content: center; 
+            gap: 15px; 
+            margin-top: 5px; 
+            font-size: 0.9em;
+        }
+
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #ddd;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16 / 9;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+        .instructions { margin-top: 15px; color: #666; font-size: 0.9em; text-align: center;}
+    </style>
+</head>
+<body>
+
+    <h2>1920x1080 Logo Overlay Tool</h2>
+
+    <div class="controls-container">
+        <div class="control-group" id="base-controls">
+            <h3>Background Canvas</h3>
+            <input type="text" id="urlBase" placeholder="Paste image URL...">
+            <input type="file" id="fileBase" accept="image/*">
+            <div class="slider-group">
+                <label>Scale:</label>
+                <input type="range" id="scaleBase" min="0.1" max="3" step="0.025" value="1">
+            </div>
+            <button class="reset-btn" id="btnResetBase">Reset Background</button>
+        </div>
+
+        <div class="center-controls">
+            <h4>Quick Placements</h4>
+            <div class="preset-grid">
+                <button class="preset-btn" id="btnLeft">← Left Placement</button>
+                <button class="preset-btn" id="btnRight">Right Placement →</button>
+            </div>
+        </div>
+
+        <div class="control-group" id="overlay-controls">
+            <h3>Logo Overlay</h3>
+            <select id="logoSelect">
+                <option value="prime">Prime Day</option>
+                <option value="savings">Big Savings</option>
+                <option value="dontmiss">Don't Miss</option>
+                <option value="lowest">Lowest Price</option>
+                <option value="pricecut">Price Cut</option>
+            </select>
+            
+            <div id="colorSelection">
+                <label><input type="radio" name="logoColor" value="black" checked> Black</label>
+                <label><input type="radio" name="logoColor" value="white"> White</label>
+            </div>
+
+            <input type="file" id="fileOverlay" accept="image/png, image/webp, image/gif" title="Upload custom overlay">
+            <div class="slider-group">
+                <label>Scale:</label>
+                <input type="range" id="scaleOverlay" min="0.1" max="3" step="0.025" value="1">
+            </div>
+            <button class="reset-btn" id="btnResetOverlay">Reset Overlay</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="compCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+    <p class="instructions">
+        <strong>Tip:</strong> The background is locked by default. Change its scale to unlock it and drag to adjust.<br>
+        <strong>Keyboard Shortcut:</strong> Click a panel and press <strong>Ctrl+V / Cmd+V</strong> to paste!
+    </p>
+    
+    <button class="export-btn" id="btnDownload">Download Final JPEG</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('compCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let imgBase = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, loaded: false };
+            let imgOverlay = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, loaded: false };
+            
+            let nextPasteTarget = 'base';
+            let isDragging = false;
+            let startX, startY;
+            let activeLayer = null;
+            const SNAP_THRESHOLD = 20;
+
+            // Exactly specified placement coordinates
+            const LEFT_X = 365;
+            const LEFT_Y = 411;
+            const RIGHT_X = 1556;
+            const RIGHT_Y = 412;
+
+            // Logo Database
+            const logoMap = {
+                prime: { default: "https://cdn.mos.cms.futurecdn.net/zJWhcwF8mymeNxqN732A8D.png" },
+                savings: { 
+                    black: "https://cdn.mos.cms.futurecdn.net/2aMopmboHvuTZ79kHs2ZcN.png", 
+                    white: "https://cdn.mos.cms.futurecdn.net/Td9Sv67G7um26bHas4hTeN.png" 
+                },
+                dontmiss: { 
+                    black: "https://cdn.mos.cms.futurecdn.net/6jg5qWVC9swErkEPHxiveN.png", 
+                    white: "https://cdn.mos.cms.futurecdn.net/HmxHZswwo8mfjq7n68FwcN.png" 
+                },
+                lowest: { 
+                    black: "https://cdn.mos.cms.futurecdn.net/xSucTucz2q2AKdHgzpaDfN.png", 
+                    white: "https://cdn.mos.cms.futurecdn.net/nY6AVinLnDd3bsqvKtJceN.png" 
+                },
+                pricecut: { 
+                    black: "https://cdn.mos.cms.futurecdn.net/wR96xfwRs2SCU3PJr76SdN.png", 
+                    white: "https://cdn.mos.cms.futurecdn.net/ZAskEL4WiPJzKNGTyDGodN.png" 
+                }
+            };
+
+            // --- RENDER LOGIC ---
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw Base Background
+                if (imgBase.loaded) {
+                    ctx.save();
+                    ctx.translate(imgBase.x, imgBase.y);
+                    ctx.scale(imgBase.scale, imgBase.scale);
+                    ctx.drawImage(imgBase.img, -imgBase.img.width / 2, -imgBase.img.height / 2);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = '#eeeeee';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                // Draw Overlay (Drawn last so it sits on top)
+                if (imgOverlay.loaded) {
+                    ctx.save();
+                    ctx.translate(imgOverlay.x, imgOverlay.y);
+                    ctx.scale(imgOverlay.scale, imgOverlay.scale);
+                    ctx.drawImage(imgOverlay.img, -imgOverlay.img.width / 2, -imgOverlay.img.height / 2);
+                    ctx.restore();
+                }
+            }
+
+            // --- BULLETPROOF IMAGE LOADING (DOUBLE-LOAD FALLBACK) ---
+            function loadImage(source, layerObj, preserveState = false) {
+                const tempImg = new Image();
+                
+                // Only attempt secure CORS if it's a web URL. Local blobs/pastes don't need it.
+                if (source.startsWith('http')) {
+                    tempImg.crossOrigin = "Anonymous";
+                }
+
+                tempImg.onload = () => {
+                    layerObj.img = tempImg;
+                    layerObj.loaded = true;
+                    
+                    if (!preserveState) {
+                        layerObj.scale = 1;
+                        layerObj.trueX = layerObj.x = canvas.width / 2;
+                        layerObj.trueY = layerObj.y = canvas.height / 2;
+                        
+                        if (layerObj === imgOverlay) {
+                            document.getElementById('scaleOverlay').value = 1;
+                        } else {
+                            document.getElementById('scaleBase').value = 1;
+                        }
+                    }
+                    draw();
+                };
+
+                // If CORS blocks the image, this instantly catches it and tries again without CORS.
+                tempImg.onerror = () => {
+                    if (tempImg.crossOrigin) {
+                        console.warn("CORS security blocked the image. Falling back to non-secure mode to force rendering.");
+                        const fallbackImg = new Image();
+                        
+                        fallbackImg.onload = () => {
+                            layerObj.img = fallbackImg;
+                            layerObj.loaded = true;
+                            
+                            if (!preserveState) {
+                                layerObj.scale = 1;
+                                layerObj.trueX = layerObj.x = canvas.width / 2;
+                                layerObj.trueY = layerObj.y = canvas.height / 2;
+                                
+                                if (layerObj === imgOverlay) {
+                                    document.getElementById('scaleOverlay').value = 1;
+                                } else {
+                                    document.getElementById('scaleBase').value = 1;
+                                }
+                            }
+                            draw();
+                        };
+                        
+                        fallbackImg.onerror = () => alert("Could not load image. The URL might be invalid.");
+                        fallbackImg.src = source;
+                    } else {
+                        alert("Could not load image. The file or URL might be invalid.");
+                    }
+                };
+
+                tempImg.src = source;
+            }
+
+            function resetLayer(layerObj, scaleId) {
+                if(layerObj.loaded) {
+                    layerObj.scale = 1;
+                    layerObj.trueX = layerObj.x = canvas.width / 2;
+                    layerObj.trueY = layerObj.y = canvas.height / 2;
+                    
+                    document.getElementById(scaleId).value = 1;
+                    draw();
+                }
+            }
+
+            // --- DYNAMIC LOGO SELECTOR ---
+            function updateLogoFromMenu(preserveState) {
+                const logoKey = document.getElementById('logoSelect').value;
+                const color = document.querySelector('input[name="logoColor"]:checked').value;
+                const colorContainer = document.getElementById('colorSelection');
+                
+                let url = '';
+                
+                if (logoKey === 'prime') {
+                    colorContainer.style.display = 'none'; // Hide colors for Prime Day
+                    url = logoMap.prime.default;
+                } else {
+                    colorContainer.style.display = 'flex'; // Show colors for everything else
+                    url = logoMap[logoKey][color];
+                }
+                
+                loadImage(url, imgOverlay, preserveState);
+                nextPasteTarget = 'base';
+            }
+
+            document.getElementById('logoSelect').addEventListener('change', () => updateLogoFromMenu(false));
+            
+            document.querySelectorAll('input[name="logoColor"]').forEach(radio => {
+                radio.addEventListener('change', () => updateLogoFromMenu(true));
+            });
+
+            // --- PRESET LOGIC ---
+            function applyPreset(position) {
+                if (!imgOverlay.loaded) return;
+
+                imgOverlay.scale = 1;
+
+                if (position === 'LEFT') {
+                    imgOverlay.trueX = imgOverlay.x = LEFT_X;
+                    imgOverlay.trueY = imgOverlay.y = LEFT_Y;
+                } else if (position === 'RIGHT') {
+                    imgOverlay.trueX = imgOverlay.x = RIGHT_X;
+                    imgOverlay.trueY = imgOverlay.y = RIGHT_Y;
+                }
+
+                document.getElementById('scaleOverlay').value = 1;
+                draw();
+            }
+
+            document.getElementById('btnLeft').addEventListener('click', () => applyPreset('LEFT'));
+            document.getElementById('btnRight').addEventListener('click', () => applyPreset('RIGHT'));
+
+            // --- GLOBAL PASTE LISTENER ---
+            window.addEventListener('paste', (e) => {
+                try {
+                    const clipboardData = e.clipboardData || window.clipboardData;
+                    if (!clipboardData || !clipboardData.items) return;
+
+                    const items = clipboardData.items;
+                    let blob = null;
+
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf("image") === 0) {
+                            blob = items[i].getAsFile();
+                            break;
+                        }
+                    }
+
+                    if (blob) {
+                        e.preventDefault(); 
+                        const url = URL.createObjectURL(blob);
+                        
+                        let targetLayer = nextPasteTarget;
+                        const activeEl = document.activeElement;
+
+                        if (activeEl) {
+                            if (activeEl.closest('#base-controls')) targetLayer = 'base';
+                            else if (activeEl.closest('#overlay-controls')) targetLayer = 'overlay';
+                        }
+
+                        if (targetLayer === 'base') {
+                            loadImage(url, imgBase, false);
+                            nextPasteTarget = 'overlay'; 
+                        } else {
+                            loadImage(url, imgOverlay, false);
+                            nextPasteTarget = 'base'; 
+                        }
+                    }
+                } catch (err) {
+                    console.error("Paste failed:", err);
+                }
+            });
+
+            // --- EVENT LISTENERS FOR INPUTS ---
+            document.getElementById('urlBase').addEventListener('change', (e) => { loadImage(e.target.value, imgBase, false); nextPasteTarget = 'overlay'; });
+            
+            document.getElementById('fileBase').addEventListener('change', (e) => { if (e.target.files[0]) { loadImage(URL.createObjectURL(e.target.files[0]), imgBase, false); nextPasteTarget = 'overlay'; } });
+            document.getElementById('fileOverlay').addEventListener('change', (e) => { if (e.target.files[0]) { loadImage(URL.createObjectURL(e.target.files[0]), imgOverlay, false); nextPasteTarget = 'base'; } });
+
+            document.getElementById('scaleBase').addEventListener('input', (e) => { imgBase.scale = parseFloat(e.target.value); draw(); });
+            document.getElementById('scaleOverlay').addEventListener('input', (e) => { imgOverlay.scale = parseFloat(e.target.value); draw(); });
+
+            document.getElementById('btnResetBase').addEventListener('click', () => resetLayer(imgBase, 'scaleBase'));
+            document.getElementById('btnResetOverlay').addEventListener('click', () => resetLayer(imgOverlay, 'scaleOverlay'));
+
+            document.getElementById('btnDownload').addEventListener('click', () => {
+                try {
+                    const link = document.createElement('a');
+                    link.download = 'watermarked-image.jpg';
+                    link.href = canvas.toDataURL('image/jpeg', 0.95);
+                    link.click();
+                } catch (err) {
+                    alert("Security Error: The browser blocked the download to protect data (due to web URLs). Please use a screenshot tool, or save your background image to your PC and use the File Upload button instead.");
+                }
+            });
+
+            // --- PRECISE HIT DETECTION FOR DRAGGING ---
+            function isMouseOverOverlay(mouseX, mouseY) {
+                if (!imgOverlay.loaded) return false;
+                
+                const hw = (imgOverlay.img.width * imgOverlay.scale) / 2;
+                const hh = (imgOverlay.img.height * imgOverlay.scale) / 2;
+                
+                return (mouseX >= imgOverlay.x - hw && mouseX <= imgOverlay.x + hw && 
+                        mouseY >= imgOverlay.y - hh && mouseY <= imgOverlay.y + hh);
+            }
+
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+                if (isMouseOverOverlay(mouseX, mouseY)) {
+                    activeLayer = imgOverlay;
+                    isDragging = true;
+                    startX = mouseX;
+                    startY = mouseY;
+                } 
+                else if (imgBase.loaded && imgBase.scale !== 1) {
+                    activeLayer = imgBase;
+                    isDragging = true;
+                    startX = mouseX;
+                    startY = mouseY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging || !activeLayer) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+                const dx = mouseX - startX;
+                const dy = mouseY - startY;
+
+                activeLayer.trueX += dx;
+                activeLayer.trueY += dy;
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                if (Math.abs(activeLayer.trueX - centerX) < SNAP_THRESHOLD) {
+                    activeLayer.x = centerX;
+                } else {
+                    activeLayer.x = activeLayer.trueX;
+                }
+
+                if (Math.abs(activeLayer.trueY - centerY) < SNAP_THRESHOLD) {
+                    activeLayer.y = centerY;
+                } else {
+                    activeLayer.y = activeLayer.trueY;
+                }
+
+                startX = mouseX;
+                startY = mouseY;
+
+                draw();
+            });
+
+            window.addEventListener('mouseup', () => { isDragging = false; activeLayer = null; });
+            window.addEventListener('mouseleave', () => { isDragging = false; activeLayer = null; });
+
+            // Initialize default logo
+            updateLogoFromMenu(false);
+            draw();
+        });
+    </script>
+</body>
+</html>

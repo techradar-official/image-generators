@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1920x1080 3-Image Splitter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .controls-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1100px; /* Widened to accommodate 3 panels smoothly */
+            justify-content: space-between;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .control-group h3 { margin-top: 0; margin-bottom: 5px; font-size: 1.1em; text-align: center;}
+        input[type="text"], input[type="file"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 90%;
+            margin: 0 auto;
+            display: block;
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+        .slider-group input { flex: 1; }
+        .center-controls {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            min-width: 130px;
+        }
+        button {
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        button:hover { background-color: #004494; }
+        .reset-btn { background-color: #6c757d; }
+        .reset-btn:hover { background-color: #5a6268; }
+        .export-btn { background-color: #28a745; font-size: 1.1em; padding: 12px 24px; margin-top: 20px; width: auto;}
+        .export-btn:hover { background-color: #218838; }
+        
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #ddd;
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 16 / 9;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+        .instructions { margin-top: 15px; color: #666; font-size: 0.9em; text-align: center;}
+    </style>
+</head>
+<body>
+
+    <h2>1920x1080 3-Image Splitter</h2>
+
+    <div class="controls-container">
+        <div class="control-group" id="left-controls">
+            <h3>Left Image</h3>
+            <input type="text" id="urlLeft" placeholder="Paste URL...">
+            <input type="file" id="fileLeft" accept="image/*">
+            <div class="slider-group">
+                <label>Scale:</label>
+                <input type="range" id="scaleLeft" min="0.1" max="3" step="0.025" value="1">
+            </div>
+            <div class="slider-group">
+                <label>Rotate:</label>
+                <input type="range" id="rotLeft" min="-180" max="180" step="1" value="0">
+            </div>
+            <button class="reset-btn" id="btnResetLeft">Reset Left</button>
+        </div>
+
+        <div class="control-group" id="mid-controls">
+            <h3>Middle Image</h3>
+            <input type="text" id="urlMid" placeholder="Paste URL...">
+            <input type="file" id="fileMid" accept="image/*">
+            <div class="slider-group">
+                <label>Scale:</label>
+                <input type="range" id="scaleMid" min="0.1" max="3" step="0.025" value="1">
+            </div>
+            <div class="slider-group">
+                <label>Rotate:</label>
+                <input type="range" id="rotMid" min="-180" max="180" step="1" value="0">
+            </div>
+            <button class="reset-btn" id="btnResetMid">Reset Middle</button>
+        </div>
+
+        <div class="center-controls">
+            <button id="btnSwapLine">⤡ Swap Wedge</button>
+            <button id="btnShiftImg">⇄ Shift Images</button>
+        </div>
+
+        <div class="control-group" id="right-controls">
+            <h3>Right Image</h3>
+            <input type="text" id="urlRight" placeholder="Paste URL...">
+            <input type="file" id="fileRight" accept="image/*">
+            <div class="slider-group">
+                <label>Scale:</label>
+                <input type="range" id="scaleRight" min="0.1" max="3" step="0.025" value="1">
+            </div>
+            <div class="slider-group">
+                <label>Rotate:</label>
+                <input type="range" id="rotRight" min="-180" max="180" step="1" value="0">
+            </div>
+            <button class="reset-btn" id="btnResetRight">Reset Right</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="splitCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+    <p class="instructions">
+        <strong>Tip:</strong> Click and drag to move images. They will lightly "snap" to the center.<br>
+        <strong>Keyboard Shortcut:</strong> Click a panel and press <strong>Ctrl+V / Cmd+V</strong> to paste a copied image!
+    </p>
+    
+    <button class="export-btn" id="btnDownload">Download Final JPEG</button>
+
+    <script>
+        const canvas = document.getElementById('splitCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Added 'trueX' and 'trueY' trackers to prevent snapping from trapping the image
+        let imgLeft = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        let imgMid = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        let imgRight = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        
+        let lineDirection = 'style1'; // 'style1' ( \ / ) or 'style2' ( / \ )
+        let nextPasteTarget = 'left';
+
+        imgLeft.img.crossOrigin = "Anonymous";
+        imgMid.img.crossOrigin = "Anonymous";
+        imgRight.img.crossOrigin = "Anonymous";
+
+        let isDragging = false;
+        let startX, startY;
+        let activeSide = null;
+        const SNAP_THRESHOLD = 20;
+
+        // Render the canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+            let topL, botL, topR, botR;
+            
+            // Define wedge shapes
+            if (lineDirection === 'style1') {
+                topL = w * 0.3; botL = w * 0.4;
+                topR = w * 0.7; botR = w * 0.6;
+            } else {
+                topL = w * 0.4; botL = w * 0.3;
+                topR = w * 0.6; botR = w * 0.7;
+            }
+
+            // Helper to draw a masked image
+            function drawMasked(imgObj, maskPath, fallbackColor) {
+                ctx.save();
+                ctx.beginPath();
+                maskPath();
+                ctx.closePath();
+                ctx.clip(); 
+
+                if (imgObj.loaded) {
+                    ctx.translate(imgObj.x, imgObj.y);
+                    ctx.rotate(imgObj.rotation * Math.PI / 180);
+                    ctx.scale(imgObj.scale, imgObj.scale);
+                    ctx.drawImage(imgObj.img, -imgObj.img.width / 2, -imgObj.img.height / 2);
+                } else {
+                    ctx.fillStyle = fallbackColor;
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // --- DRAW MASKS ---
+            drawMasked(imgLeft, () => {
+                ctx.moveTo(0, 0); ctx.lineTo(topL, 0); ctx.lineTo(botL, h); ctx.lineTo(0, h);
+            }, '#eeeeee');
+
+            drawMasked(imgMid, () => {
+                ctx.moveTo(topL, 0); ctx.lineTo(topR, 0); ctx.lineTo(botR, h); ctx.lineTo(botL, h);
+            }, '#e0e0e0');
+
+            drawMasked(imgRight, () => {
+                ctx.moveTo(topR, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(botR, h);
+            }, '#cccccc');
+
+            // --- DRAW THICK WHITE SPLIT LINES WITH OFF-CANVAS CAPS ---
+            const extY = 100;
+            let extXL = (extY / h) * (botL - topL);
+            let extXR = (extY / h) * (botR - topR);
+
+            ctx.strokeStyle = '#ffffff'; 
+            ctx.lineWidth = 20; // 20px per request
+
+            // Left Line
+            ctx.beginPath();
+            ctx.moveTo(topL - extXL, -extY); 
+            ctx.lineTo(botL + extXL, h + extY); 
+            ctx.stroke();
+
+            // Right Line
+            ctx.beginPath();
+            ctx.moveTo(topR - extXR, -extY); 
+            ctx.lineTo(botR + extXR, h + extY); 
+            ctx.stroke();
+        }
+
+        function loadImage(source, sideObj, callback) {
+            sideObj.img.onload = () => {
+                sideObj.loaded = true;
+                sideObj.x = canvas.width / 2;
+                sideObj.y = canvas.height / 2;
+                sideObj.trueX = canvas.width / 2;
+                sideObj.trueY = canvas.height / 2;
+                sideObj.scale = 1;
+                sideObj.rotation = 0;
+                draw();
+                if (callback) callback();
+            };
+            sideObj.img.onerror = () => {
+                alert("Could not load image. It might be blocked by the website's security (CORS). Try saving the image to your computer and uploading it instead.");
+            }
+            sideObj.img.src = source;
+        }
+
+        function resetSide(sideObj, scaleId, rotId) {
+            if(sideObj.loaded) {
+                sideObj.x = canvas.width / 2;
+                sideObj.y = canvas.height / 2;
+                sideObj.trueX = canvas.width / 2;
+                sideObj.trueY = canvas.height / 2;
+                sideObj.scale = 1;
+                sideObj.rotation = 0;
+                document.getElementById(scaleId).value = 1;
+                document.getElementById(rotId).value = 0;
+                draw();
+            }
+        }
+
+        // --- GLOBAL PASTE LISTENER (CONTEXT AWARE) ---
+        window.addEventListener('paste', (e) => {
+            try {
+                const clipboardData = e.clipboardData || window.clipboardData;
+                if (!clipboardData || !clipboardData.items) return;
+
+                const items = clipboardData.items;
+                let blob = null;
+
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf("image") === 0) {
+                        blob = items[i].getAsFile();
+                        break;
+                    }
+                }
+
+                if (blob) {
+                    e.preventDefault();
+                    const url = URL.createObjectURL(blob);
+                    
+                    let targetSide = nextPasteTarget;
+                    const activeEl = document.activeElement;
+
+                    if (activeEl) {
+                        if (activeEl.closest('#left-controls')) targetSide = 'left';
+                        else if (activeEl.closest('#mid-controls')) targetSide = 'mid';
+                        else if (activeEl.closest('#right-controls')) targetSide = 'right';
+                    }
+
+                    if (targetSide === 'left') {
+                        loadImage(url, imgLeft);
+                        nextPasteTarget = 'mid'; 
+                    } else if (targetSide === 'mid') {
+                        loadImage(url, imgMid);
+                        nextPasteTarget = 'right'; 
+                    } else {
+                        loadImage(url, imgRight);
+                        nextPasteTarget = 'left'; 
+                    }
+                }
+            } catch (err) {
+                console.error("Paste handled cleanly but failed:", err);
+            }
+        });
+
+        // --- EVENT LISTENERS FOR INPUTS ---
+        const sides = [
+            { id: 'Left', obj: imgLeft, nextTarget: 'mid' }, 
+            { id: 'Mid', obj: imgMid, nextTarget: 'right' }, 
+            { id: 'Right', obj: imgRight, nextTarget: 'left' }
+        ];
+
+        sides.forEach(s => {
+            document.getElementById(`url${s.id}`).addEventListener('change', (e) => {
+                loadImage(e.target.value, s.obj);
+                nextPasteTarget = s.nextTarget;
+            });
+            document.getElementById(`file${s.id}`).addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    loadImage(URL.createObjectURL(e.target.files[0]), s.obj);
+                    nextPasteTarget = s.nextTarget;
+                }
+            });
+            document.getElementById(`scale${s.id}`).addEventListener('input', (e) => { s.obj.scale = parseFloat(e.target.value); draw(); });
+            document.getElementById(`rot${s.id}`).addEventListener('input', (e) => { s.obj.rotation = parseInt(e.target.value); draw(); });
+            document.getElementById(`btnReset${s.id}`).addEventListener('click', () => resetSide(s.obj, `scale${s.id}`, `rot${s.id}`));
+        });
+
+        // --- UTILITY CONTROLS ---
+        document.getElementById('btnSwapLine').addEventListener('click', () => {
+            lineDirection = lineDirection === 'style1' ? 'style2' : 'style1';
+            draw();
+        });
+
+        document.getElementById('btnShiftImg').addEventListener('click', () => {
+            // Shifts all images to the right (Left -> Mid, Mid -> Right, Right -> Left)
+            const tempImg = imgRight.img;
+            const tempLoaded = imgRight.loaded;
+            const tempX = imgRight.x; const tempY = imgRight.y;
+            const tempTrueX = imgRight.trueX; const tempTrueY = imgRight.trueY;
+            const tempScale = imgRight.scale; const tempRot = imgRight.rotation;
+
+            // Move Mid to Right
+            imgRight.img = imgMid.img; imgRight.loaded = imgMid.loaded;
+            imgRight.x = imgMid.x; imgRight.y = imgMid.y;
+            imgRight.trueX = imgMid.trueX; imgRight.trueY = imgMid.trueY;
+            imgRight.scale = imgMid.scale; imgRight.rotation = imgMid.rotation;
+
+            // Move Left to Mid
+            imgMid.img = imgLeft.img; imgMid.loaded = imgLeft.loaded;
+            imgMid.x = imgLeft.x; imgMid.y = imgLeft.y;
+            imgMid.trueX = imgLeft.trueX; imgMid.trueY = imgLeft.trueY;
+            imgMid.scale = imgLeft.scale; imgMid.rotation = imgLeft.rotation;
+
+            // Move Temp(Right) to Left
+            imgLeft.img = tempImg; imgLeft.loaded = tempLoaded;
+            imgLeft.x = tempX; imgLeft.y = tempY;
+            imgLeft.trueX = tempTrueX; imgLeft.trueY = tempTrueY;
+            imgLeft.scale = tempScale; imgLeft.rotation = tempRot;
+
+            // Update UI
+            sides.forEach(s => {
+                document.getElementById(`scale${s.id}`).value = s.obj.scale;
+                document.getElementById(`rot${s.id}`).value = s.obj.rotation;
+            });
+
+            draw();
+        });
+
+        document.getElementById('btnDownload').addEventListener('click', () => {
+            try {
+                const link = document.createElement('a');
+                link.download = '3-split-image.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+            } catch (err) {
+                alert("Security Error: Browser blocked download due to CORS policy. Please download the original images to your PC and use the File Upload buttons instead.");
+            }
+        });
+
+        // --- DRAG AND DROP & SNAPPING LOGIC ---
+        function getHitZone(mouseX, mouseY) {
+            const w = canvas.width;
+            const h = canvas.height;
+            let topL, botL, topR, botR;
+            
+            if (lineDirection === 'style1') { 
+                topL=0.3; botL=0.4; topR=0.7; botR=0.6; 
+            } else { 
+                topL=0.4; botL=0.3; topR=0.6; botR=0.7; 
+            }
+            
+            const expectedXL = (topL * w) + ((mouseY - 0) * ((botL * w) - (topL * w)) / h);
+            const expectedXR = (topR * w) + ((mouseY - 0) * ((botR * w) - (topR * w)) / h);
+            
+            if (mouseX < expectedXL) return imgLeft;
+            if (mouseX > expectedXR) return imgRight;
+            return imgMid;
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const hitZone = getHitZone(mouseX, mouseY);
+            if (hitZone.loaded) { 
+                activeSide = hitZone; 
+                isDragging = true; 
+            }
+
+            startX = mouseX;
+            startY = mouseY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging || !activeSide) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const dx = mouseX - startX;
+            const dy = mouseY - startY;
+
+            activeSide.trueX += dx;
+            activeSide.trueY += dy;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            if (Math.abs(activeSide.trueX - centerX) < SNAP_THRESHOLD) {
+                activeSide.x = centerX;
+            } else {
+                activeSide.x = activeSide.trueX;
+            }
+
+            if (Math.abs(activeSide.trueY - centerY) < SNAP_THRESHOLD) {
+                activeSide.y = centerY;
+            } else {
+                activeSide.y = activeSide.trueY;
+            }
+
+            startX = mouseX;
+            startY = mouseY;
+
+            draw();
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; activeSide = null; });
+        window.addEventListener('mouseleave', () => { isDragging = false; activeSide = null; });
+
+        draw();
+    </script>
+</body>
+</html>

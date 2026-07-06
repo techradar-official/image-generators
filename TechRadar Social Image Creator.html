@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TechRadar Social Graphic Generator</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f0f2f5; color: #333; margin: 0; padding: 30px; display: flex; justify-content: center; }
+    .container { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; max-width: 1150px; display: flex; gap: 30px; }
+    
+    /* Left Side: Controls Panel */
+    .controls-panel { flex: 1; max-width: 480px; display: flex; flex-direction: column; justify-content: transform; }
+    h2 { margin-top: 0; color: #111; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 22px; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 6px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type="text"], textarea, select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    textarea { height: 75px; resize: vertical; }
+    
+    /* Universal Paste Box Styling */
+    #universalPaste { width: 100%; box-sizing: border-box; padding: 16px; border: 2px dashed #007aff; background: #e6f2ff; color: #007aff; text-align: center; border-radius: 6px; font-weight: bold; font-size: 14px; transition: background 0.2s; }
+    #universalPaste:focus { background: #d0e7ff; outline: none; }
+    #universalPaste::placeholder { color: #007aff; opacity: 0.7; font-weight: bold; }
+    
+    /* Toggle Groups */
+    .toggle-group { display: flex; gap: 10px; background: #eee; padding: 4px; border-radius: 8px; }
+    .toggle-btn { flex: 1; padding: 8px; font-size: 13px; font-weight: bold; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: #555; transition: all 0.2s; }
+    .toggle-btn.active { background: #fff; color: #007aff; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    
+    .counter-text { font-size: 12px; color: #666; margin-top: 5px; text-align: right; }
+    .counter-warn { color: #d9383a; font-weight: bold; }
+    .hint-text { font-size: 12px; color: #666; font-style: italic; margin-top: 4px; }
+    
+    button.main-action { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+    button.main-action:hover { background: #0063cc; }
+    #status { text-align: center; margin-top: 12px; font-size: 13px; color: #666; font-style: italic; }
+    
+    /* Right Side: Interactive Canvas Workspace */
+    .canvas-panel { flex: 1; display: flex; flex-direction: column; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 15px; border: 1px solid #e1e4e8; }
+    .canvas-wrapper { position: relative; width: 100%; max-width: 400px; aspect-ratio: 1080/1350; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 4px; overflow: hidden; }
+    #mainCanvas { width: 100%; height: 100%; display: block; cursor: move; background: #e1e4e8; }
+    .canvas-instruction { font-size: 12px; color: #888; margin-top: 10px; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="controls-panel">
+      <h2>TechRadar Social Generator</h2>
+
+      <div class="field">
+        <label>1. Add Background Image</label>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input type="text" id="universalPaste" placeholder="Paste Image URL here (Or Cmd+V an image anywhere!)" autocomplete="off">
+          <div style="text-align:center; font-size:11px; font-weight:bold; color:#aaa; margin:2px 0;">OR UPLOAD LOCAL FILE</div>
+          <input type="file" id="fileInput" accept="image/*">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>TechRadar Logo Variant</label>
+        <div class="toggle-group" id="logoToggle">
+          <button class="toggle-btn active" data-value="pink">Pink Logo</button>
+          <button class="toggle-btn" data-value="white">White Logo</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Text Background Tint (92% Opacity)</label>
+        <div class="toggle-group" id="bgToggle">
+          <button class="toggle-btn active" data-value="pink">Pink Tint</button>
+          <button class="toggle-btn" data-value="dark">Dark Tint</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>2. Headline Text</label>
+        <textarea id="headlineText" placeholder="Paste article headline here..."></textarea>
+        <div id="charCounter" class="counter-text">Recommended Max Characters: 95 (Current: 0)</div>
+      </div>
+
+      <div class="field">
+        <label>3. Image Credit</label>
+        <input type="text" id="creditText" placeholder="e.g., Future / Getty Images">
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+          <label style="margin: 0; min-width: max-content;">Font Size</label>
+          <input type="range" id="creditSizeSlider" min="15" max="45" value="30" style="flex: 1;">
+        </div>
+      </div>
+
+      <button class="main-action" id="btnGenerate">Download Master JPEG</button>
+      <div id="status">System Ready. Please select or paste an image.</div>
+    </div>
+
+    <div class="canvas-panel">
+      <label style="margin-bottom: 10px; font-size: 12px;">Live Workspace Canvas</label>
+      <div class="canvas-wrapper">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+      <div class="canvas-instruction">↔️ Click and drag image left/right to adjust framing</div>
+    </div>
+  </div>
+
+  <script>
+    const ASSETS = {
+      logoPink: "https://cdn.mos.cms.futurecdn.net/Qyk7VnMAdEjXVhY2mL5hDK.png",
+      logoWhite: "https://cdn.mos.cms.futurecdn.net/iYWUxLd3YgifpMzVjxPBBQ.png",
+      bgPink: "https://cdn.mos.cms.futurecdn.net/je7uvW67uSnVdiRCqEksFK.png",
+      bgDark: "https://cdn.mos.cms.futurecdn.net/gqBSCt8sPuUbMxcY4kJsEK.png"
+    };
+
+    const loadedAssets = {};
+    let articleImg = null;
+    
+    let imageOffsetX = 0;
+    let scaledWidth = 1080;
+    let isDragging = false;
+    let startX = 0;
+
+    let activeLogo = "pink";
+    let activeBg = "pink";
+
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 1080;
+    canvas.height = 1350;
+
+    const statusEl = document.getElementById('status');
+    const headlineText = document.getElementById('headlineText');
+    const charCounter = document.getElementById('charCounter');
+    const universalPaste = document.getElementById('universalPaste');
+    const creditSizeSlider = document.getElementById('creditSizeSlider');
+
+    function updateStatus(msg) { statusEl.innerText = msg; }
+
+    async function initApp() {
+      updateStatus("Caching asset variations from CDN servers...");
+      try {
+        const promises = Object.keys(ASSETS).map(async (key) => {
+          loadedAssets[key] = await loadImage(ASSETS[key]);
+        });
+        await Promise.all(promises);
+        updateStatus("All assets cached. Ready for input.");
+        drawCanvas();
+      } catch (err) {
+        updateStatus("Network Error: Could not pull assets from CDN.");
+        console.error(err);
+      }
+    }
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, 1080, 1350);
+
+      if (articleImg) {
+        ctx.drawImage(articleImg, imageOffsetX, 0, scaledWidth, 1350);
+      } else {
+        ctx.fillStyle = "#333333";
+        ctx.fillRect(0, 0, 1080, 1350);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "30px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Paste or Upload an Image to Start", 540, 675);
+        ctx.textAlign = "left";
+      }
+
+      const bgKey = activeBg === "pink" ? "bgPink" : "bgDark";
+      if (loadedAssets[bgKey]) {
+        ctx.save();
+        ctx.globalAlpha = 0.92; 
+        ctx.drawImage(loadedAssets[bgKey], 0, 0, 1080, 1350);
+        ctx.restore(); 
+      }
+
+      const logoKey = activeLogo === "pink" ? "logoPink" : "logoWhite";
+      if (loadedAssets[logoKey]) {
+        ctx.drawImage(loadedAssets[logoKey], 0, 0, 1080, 1350);
+      }
+
+      const headline = headlineText.value || "Type or paste your headline here...";
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 48px Arial';
+      ctx.textBaseline = 'top';
+
+      const textX = 87;
+      const textY = 1098;
+      const maxWidth = 806;
+      
+      const lines = wrapText(ctx, headline, maxWidth);
+      let currentY = textY;
+      lines.forEach(line => {
+        ctx.fillText(line, textX, currentY);
+        currentY += 62; 
+      });
+
+      const credit = document.getElementById('creditText').value;
+      const creditSize = creditSizeSlider.value;
+      if (credit) {
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF'; 
+        ctx.font = `${creditSize}px Arial`; 
+        ctx.textAlign = 'center'; 
+        
+        const creditX = 1030; 
+        const creditY = 1191; 
+
+        ctx.translate(creditX, creditY);
+        ctx.rotate(-Math.PI / 2); 
+        ctx.fillText(credit, 0, 0); 
+        ctx.restore();
+      }
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!articleImg) return;
+      isDragging = true;
+      startX = e.clientX;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging || !articleImg) return;
+      const deltaX = e.clientX - startX;
+      startX = e.clientX;
+
+      const rect = canvas.getBoundingClientRect();
+      const canvasDeltaX = deltaX * (canvas.width / rect.width);
+      imageOffsetX += canvasDeltaX;
+
+      const minX = 1080 - scaledWidth;
+      if (imageOffsetX > 0) imageOffsetX = 0;
+      if (imageOffsetX < minX) imageOffsetX = minX;
+
+      drawCanvas();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    setupToggle('logoToggle', (val) => { activeLogo = val; drawCanvas(); });
+    setupToggle('bgToggle', (val) => { activeBg = val; drawCanvas(); });
+
+    function setupToggle(elementId, callback) {
+      const container = document.getElementById(elementId);
+      const buttons = container.querySelectorAll('.toggle-btn');
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          buttons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          callback(btn.getAttribute('data-value'));
+        });
+      });
+    }
+
+    function processIncomingImage(src) {
+      updateStatus("Processing canvas layout metrics...");
+      const img = new Image();
+      img.crossOrigin = "anonymous"; 
+      img.onload = () => {
+        articleImg = img;
+        scaledWidth = img.width * (1350 / img.height);
+        
+        if (scaledWidth < 1080) {
+          scaledWidth = 1080;
+          imageOffsetX = 0;
+        } else {
+          imageOffsetX = (1080 - scaledWidth) / 2;
+        }
+        drawCanvas();
+        updateStatus("Image loaded! Click and drag directly on the canvas to pan framing.");
+      };
+      img.onerror = () => {
+        updateStatus("Error loading image. If using a URL link, browser security may be blocking it. Try right-clicking the image directly and choosing 'Copy Image' instead.");
+      };
+      img.src = src;
+    }
+
+    document.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (let index in items) {
+        const item = items[index];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          e.preventDefault(); 
+          updateStatus("Loading pasted image file...");
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = (event) => processIncomingImage(event.target.result);
+          reader.readAsDataURL(blob);
+          return; 
+        }
+      }
+    });
+
+    universalPaste.addEventListener('input', (e) => {
+      const pastedText = e.target.value.trim();
+      
+      if (pastedText.startsWith('http://') || pastedText.startsWith('https://')) {
+        updateStatus("Analyzing image URL...");
+        let cleanUrl = pastedText;
+        
+        if (cleanUrl.includes('futurecdn.net')) {
+          cleanUrl = cleanUrl.replace(/\.webp$/, '');
+          cleanUrl = cleanUrl.replace(/-\d+-\d+(\.[a-zA-Z]+)$/, '$1');
+        }
+        
+        processIncomingImage(cleanUrl);
+        
+        setTimeout(() => { e.target.value = ''; }, 1000);
+      }
+    });
+
+    headlineText.addEventListener('input', () => {
+      const currentLength = headlineText.value.length;
+      charCounter.innerText = `Recommended Max Characters: 95 (Current: ${currentLength})`;
+      
+      if (currentLength > 95) charCounter.classList.add('counter-warn');
+      else charCounter.classList.remove('counter-warn');
+      drawCanvas();
+    });
+
+    document.getElementById('creditText').addEventListener('input', drawCanvas);
+    creditSizeSlider.addEventListener('input', drawCanvas);
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => processIncomingImage(event.target.result);
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('btnGenerate').addEventListener('click', () => {
+      if (!articleImg) {
+        updateStatus("Error: Can't generate without a background image.");
+        return;
+      }
+      
+      updateStatus("Flattening high-fidelity image components...");
+      const headline = headlineText.value || "Social Graphic";
+      
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const link = document.createElement('a');
+      
+      let safeName = headline.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 40);
+      const now = new Date();
+      const timestamp = now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + "_" + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      
+      link.download = `${safeName}_tr_${timestamp}.jpg`;
+      link.href = dataUrl;
+      link.click();
+      updateStatus("Success! Exported graphic delivered to downloads.");
+    });
+
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous"; 
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Asset fetch failed"));
+        img.src = url;
+      });
+    }
+
+    function wrapText(ctx, text, maxWidth) {
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = words[0] || "";
+      for (let i = 1; i < words.length; i++) {
+        let word = words[i];
+        let testLine = currentLine + " " + word;
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width < maxWidth) {
+          currentLine = testLine;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+      return lines;
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
