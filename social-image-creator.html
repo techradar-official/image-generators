@@ -27,11 +27,13 @@
     
     .counter-text { font-size: 12px; color: #666; margin-top: 5px; text-align: right; }
     .counter-warn { color: #d9383a; font-weight: bold; }
-    .hint-text { font-size: 12px; color: #666; font-style: italic; margin-top: 4px; }
     
     button.main-action { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
     button.main-action:hover { background: #0063cc; }
-    #status { text-align: center; margin-top: 12px; font-size: 13px; color: #666; font-style: italic; }
+    
+    /* Improved Status Bar */
+    #status { text-align: center; margin-top: 12px; font-size: 13px; color: #666; font-style: italic; padding: 8px; border-radius: 4px; }
+    .status-error { background: #ffe6e6; color: #d9383a !important; font-weight: bold; border: 1px solid #d9383a; }
     
     /* Right Side: Interactive Canvas Workspace */
     .canvas-panel { flex: 1; display: flex; flex-direction: column; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 15px; border: 1px solid #e1e4e8; }
@@ -45,6 +47,14 @@
   <div class="container">
     <div class="controls-panel">
       <h2>TechRadar Social Generator</h2>
+
+      <div class="field" style="background: #e6f2ff; padding: 10px; border-radius: 8px; border: 1px solid #b3d7ff;">
+        <label style="color: #0056b3;">Select Template Layout</label>
+        <div class="toggle-group" id="templateToggle" style="background: #cce4ff;">
+          <button class="toggle-btn active" data-value="standard">Standard Template</button>
+          <button class="toggle-btn" data-value="wide">Wide Template</button>
+        </div>
+      </div>
 
       <div class="field">
         <label>1. Add Background Image</label>
@@ -64,10 +74,10 @@
       </div>
 
       <div class="field">
-        <label>Text Background Tint (92% Opacity)</label>
+        <label>Background Style</label>
         <div class="toggle-group" id="bgToggle">
-          <button class="toggle-btn active" data-value="pink">Pink Tint</button>
-          <button class="toggle-btn" data-value="dark">Dark Tint</button>
+          <button class="toggle-btn active" data-value="pink">Pink Background</button>
+          <button class="toggle-btn" data-value="dark">Dark Background</button>
         </div>
       </div>
 
@@ -82,7 +92,7 @@
         <input type="text" id="creditText" placeholder="e.g., Future / Getty Images">
         <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
           <label style="margin: 0; min-width: max-content;">Font Size</label>
-          <input type="range" id="creditSizeSlider" min="15" max="45" value="30" style="flex: 1;">
+          <input type="range" id="creditSizeSlider" min="15" max="45" value="33" style="flex: 1;">
         </div>
       </div>
 
@@ -95,7 +105,7 @@
       <div class="canvas-wrapper">
         <canvas id="mainCanvas"></canvas>
       </div>
-      <div class="canvas-instruction">↔️ Click and drag image left/right to adjust framing</div>
+      <div class="canvas-instruction" id="dragInstruction">↔️ Click and drag image horizontally to adjust framing</div>
     </div>
   </div>
 
@@ -103,20 +113,25 @@
     const ASSETS = {
       logoPink: "https://cdn.mos.cms.futurecdn.net/Qyk7VnMAdEjXVhY2mL5hDK.png",
       logoWhite: "https://cdn.mos.cms.futurecdn.net/iYWUxLd3YgifpMzVjxPBBQ.png",
-      bgPink: "https://cdn.mos.cms.futurecdn.net/je7uvW67uSnVdiRCqEksFK.png",
-      bgDark: "https://cdn.mos.cms.futurecdn.net/gqBSCt8sPuUbMxcY4kJsEK.png"
+      bgPinkStandard: "https://cdn.mos.cms.futurecdn.net/6zdf2u2aGcQzTAv55rjqM8.png",
+      bgDarkStandard: "https://cdn.mos.cms.futurecdn.net/rShcqrSXnS5X5MLZKhuoN8.png",
+      bgPinkWide: "https://cdn.mos.cms.futurecdn.net/iKSbZvmvBHKQ3AgY9wweKS.png",
+      bgDarkWide: "https://cdn.mos.cms.futurecdn.net/cgjobKx95EXJ6H2nvMasKS.png",
+      gradientMask: "https://cdn.mos.cms.futurecdn.net/4paWUbHLv5h6tvD6qGpbDS.png" 
     };
 
     const loadedAssets = {};
     let articleImg = null;
     
-    let imageOffsetX = 0;
-    let scaledWidth = 1080;
-    let isDragging = false;
-    let startX = 0;
-
+    let currentTemplate = "standard"; 
     let activeLogo = "pink";
     let activeBg = "pink";
+
+    let imageOffsetX = 0;
+    let scaledWidth = 1080;
+    let scaledHeight = 1350; 
+    let isDragging = false;
+    let startX = 0;
 
     const canvas = document.getElementById('mainCanvas');
     const ctx = canvas.getContext('2d');
@@ -128,8 +143,16 @@
     const charCounter = document.getElementById('charCounter');
     const universalPaste = document.getElementById('universalPaste');
     const creditSizeSlider = document.getElementById('creditSizeSlider');
+    const dragInstruction = document.getElementById('dragInstruction');
 
-    function updateStatus(msg) { statusEl.innerText = msg; }
+    function updateStatus(msg, isError = false) { 
+      statusEl.innerText = msg; 
+      if (isError) {
+        statusEl.classList.add('status-error');
+      } else {
+        statusEl.classList.remove('status-error');
+      }
+    }
 
     async function initApp() {
       updateStatus("Caching asset variations from CDN servers...");
@@ -141,14 +164,25 @@
         updateStatus("All assets cached. Ready for input.");
         drawCanvas();
       } catch (err) {
-        updateStatus("Network Error: Could not pull assets from CDN.");
-        console.error(err);
+        updateStatus("Warning: Your network blocked some CDN assets.", true);
+        console.error("Asset loading error: ", err);
+        drawCanvas();
       }
     }
 
     function drawCanvas() {
       ctx.clearRect(0, 0, 1080, 1350);
+      
+      if (currentTemplate === "standard") {
+        dragInstruction.innerText = "↔️ Click and drag image horizontally to adjust framing";
+        drawStandardCanvas();
+      } else {
+        dragInstruction.innerText = "↔️ Click and drag image horizontally to adjust framing";
+        drawWideCanvas();
+      }
+    }
 
+    function drawStandardCanvas() {
       if (articleImg) {
         ctx.drawImage(articleImg, imageOffsetX, 0, scaledWidth, 1350);
       } else {
@@ -161,7 +195,7 @@
         ctx.textAlign = "left";
       }
 
-      const bgKey = activeBg === "pink" ? "bgPink" : "bgDark";
+      const bgKey = activeBg === "pink" ? "bgPinkStandard" : "bgDarkStandard";
       if (loadedAssets[bgKey]) {
         ctx.save();
         ctx.globalAlpha = 0.92; 
@@ -178,7 +212,6 @@
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 48px Arial';
       ctx.textBaseline = 'top';
-
       const textX = 87;
       const textY = 1098;
       const maxWidth = 806;
@@ -195,17 +228,101 @@
       if (credit) {
         ctx.save();
         ctx.fillStyle = '#FFFFFF'; 
-        ctx.font = `${creditSize}px Arial`; 
-        ctx.textAlign = 'center'; 
-        
-        const creditX = 1030; 
-        const creditY = 1191; 
+        ctx.font = `500 ${creditSize}px Arial`; 
+        ctx.textAlign = 'left'; 
+        ctx.textBaseline = 'middle';
+        const creditX = 1036; 
+        const creditY = 1263; 
 
         ctx.translate(creditX, creditY);
         ctx.rotate(-Math.PI / 2); 
         ctx.fillText(credit, 0, 0); 
         ctx.restore();
       }
+    }
+
+    function drawWideCanvas() {
+      if (articleImg) {
+        ctx.drawImage(articleImg, imageOffsetX, 0, scaledWidth, 880);
+      } else {
+        ctx.fillStyle = "#333333";
+        ctx.fillRect(0, 0, 1080, 880); 
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "30px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Paste or Upload an Image to Start", 540, 440);
+        ctx.textAlign = "left";
+      }
+      
+      if (loadedAssets.gradientMask) {
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(loadedAssets.gradientMask, 0, 0, 1080, 1350);
+      }
+
+      ctx.globalCompositeOperation = 'destination-over';
+      const bgKey = activeBg === "pink" ? "bgPinkWide" : "bgDarkWide";
+      if (loadedAssets[bgKey]) {
+        ctx.drawImage(loadedAssets[bgKey], 0, 0, 1080, 1350);
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      const logoKey = activeLogo === "pink" ? "logoPink" : "logoWhite";
+      if (loadedAssets[logoKey]) {
+        ctx.drawImage(loadedAssets[logoKey], 0, 0, 1080, 1350);
+      }
+
+      const headline = headlineText.value || "Type or paste your headline here...";
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 73px Arial';
+      ctx.textBaseline = 'top';
+      const textX = 60;
+      const textY = 926;
+      const maxWidth = 908; 
+      
+      const lines = wrapText(ctx, headline, maxWidth);
+      let currentY = textY;
+      lines.forEach(line => {
+        ctx.fillText(line, textX, currentY);
+        currentY += 92; 
+      });
+
+      const credit = document.getElementById('creditText').value;
+      const creditSize = creditSizeSlider.value;
+      if (credit) {
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF'; 
+        ctx.font = `500 ${creditSize}px Arial`; 
+        ctx.textAlign = 'left'; 
+        ctx.textBaseline = 'middle';
+        const creditX = 1036; 
+        const creditY = 1265; 
+
+        ctx.translate(creditX, creditY);
+        ctx.rotate(-Math.PI / 2); 
+        ctx.fillText(credit, 0, 0); 
+        ctx.restore();
+      }
+    }
+
+    function recalculateImageDimensions() {
+      if (!articleImg) return;
+      
+      if (currentTemplate === "standard") {
+        scaledHeight = 1350;
+        scaledWidth = articleImg.width * (1350 / articleImg.height);
+        if (scaledWidth < 1080) {
+          scaledWidth = 1080;
+          scaledHeight = articleImg.height * (1080 / articleImg.width);
+        }
+      } else {
+        scaledHeight = 880;
+        scaledWidth = articleImg.width * (880 / articleImg.height);
+        if (scaledWidth < 1080) {
+          scaledWidth = 1080;
+          scaledHeight = articleImg.height * (1080 / articleImg.width);
+        }
+      }
+      imageOffsetX = (1080 - scaledWidth) / 2;
     }
 
     canvas.addEventListener('mousedown', (e) => {
@@ -223,7 +340,7 @@
       const canvasDeltaX = deltaX * (canvas.width / rect.width);
       imageOffsetX += canvasDeltaX;
 
-      const minX = 1080 - scaledWidth;
+      const minX = Math.min(0, 1080 - scaledWidth);
       if (imageOffsetX > 0) imageOffsetX = 0;
       if (imageOffsetX < minX) imageOffsetX = minX;
 
@@ -231,7 +348,13 @@
     });
 
     window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('mouseleave', () => { isDragging = false; });
 
+    setupToggle('templateToggle', (val) => { 
+      currentTemplate = val; 
+      recalculateImageDimensions();
+      drawCanvas(); 
+    });
     setupToggle('logoToggle', (val) => { activeLogo = val; drawCanvas(); });
     setupToggle('bgToggle', (val) => { activeBg = val; drawCanvas(); });
 
@@ -250,37 +373,49 @@
     function processIncomingImage(src) {
       updateStatus("Processing canvas layout metrics...");
       const img = new Image();
-      img.crossOrigin = "anonymous"; 
+      
+      // CRITICAL FIX: Only apply crossOrigin to actual external URLs.
+      // Applying it to local Blob/Data URLs causes Chrome to throw a silent security crash.
+      if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+        img.crossOrigin = "anonymous"; 
+      }
+      
       img.onload = () => {
         articleImg = img;
-        scaledWidth = img.width * (1350 / img.height);
-        
-        if (scaledWidth < 1080) {
-          scaledWidth = 1080;
-          imageOffsetX = 0;
-        } else {
-          imageOffsetX = (1080 - scaledWidth) / 2;
-        }
+        recalculateImageDimensions();
         drawCanvas();
-        updateStatus("Image loaded! Click and drag directly on the canvas to pan framing.");
+        updateStatus("Image loaded! Click and drag horizontally to pan framing.");
       };
-      img.onerror = () => {
-        updateStatus("Error loading image. If using a URL link, browser security may be blocking it. Try right-clicking the image directly and choosing 'Copy Image' instead.");
+      
+      // CRITICAL FIX: Explicit error reporting instead of a silent crash.
+      img.onerror = (e) => {
+        console.error("Image Processing Error:", e);
+        updateStatus("Security Error: Chrome blocked the image. Try using the 'Upload Local File' button instead.", true);
       };
+      
       img.src = src;
     }
 
     document.addEventListener('paste', (e) => {
-      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-      for (let index in items) {
-        const item = items[index];
+      if (!e.clipboardData) return;
+      const items = e.clipboardData.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         if (item.kind === 'file' && item.type.startsWith('image/')) {
           e.preventDefault(); 
           updateStatus("Loading pasted image file...");
+          
           const blob = item.getAsFile();
-          const reader = new FileReader();
-          reader.onload = (event) => processIncomingImage(event.target.result);
-          reader.readAsDataURL(blob);
+          if (!blob) {
+            updateStatus("Error: Browser prevented clipboard access.", true);
+            return;
+          }
+          
+          // CRITICAL FIX: Bypasses base64 data limitations used by strict corporate CSPs
+          const objectUrl = URL.createObjectURL(blob);
+          processIncomingImage(objectUrl);
           return; 
         }
       }
@@ -288,18 +423,14 @@
 
     universalPaste.addEventListener('input', (e) => {
       const pastedText = e.target.value.trim();
-      
       if (pastedText.startsWith('http://') || pastedText.startsWith('https://')) {
         updateStatus("Analyzing image URL...");
         let cleanUrl = pastedText;
-        
         if (cleanUrl.includes('futurecdn.net')) {
           cleanUrl = cleanUrl.replace(/\.webp$/, '');
           cleanUrl = cleanUrl.replace(/-\d+-\d+(\.[a-zA-Z]+)$/, '$1');
         }
-        
         processIncomingImage(cleanUrl);
-        
         setTimeout(() => { e.target.value = ''; }, 1000);
       }
     });
@@ -307,7 +438,6 @@
     headlineText.addEventListener('input', () => {
       const currentLength = headlineText.value.length;
       charCounter.innerText = `Recommended Max Characters: 95 (Current: ${currentLength})`;
-      
       if (currentLength > 95) charCounter.classList.add('counter-warn');
       else charCounter.classList.remove('counter-warn');
       drawCanvas();
@@ -319,32 +449,36 @@
     document.getElementById('fileInput').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => processIncomingImage(event.target.result);
-        reader.readAsDataURL(file);
+        // Use ObjectURL here too for consistency and safety
+        const objectUrl = URL.createObjectURL(file);
+        processIncomingImage(objectUrl);
       }
     });
 
     document.getElementById('btnGenerate').addEventListener('click', () => {
       if (!articleImg) {
-        updateStatus("Error: Can't generate without a background image.");
+        updateStatus("Error: Can't generate without a background image.", true);
         return;
       }
-      
       updateStatus("Flattening high-fidelity image components...");
       const headline = headlineText.value || "Social Graphic";
       
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const link = document.createElement('a');
-      
-      let safeName = headline.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 40);
-      const now = new Date();
-      const timestamp = now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + "_" + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-      
-      link.download = `${safeName}_tr_${timestamp}.jpg`;
-      link.href = dataUrl;
-      link.click();
-      updateStatus("Success! Exported graphic delivered to downloads.");
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+        const link = document.createElement('a');
+        
+        let safeName = headline.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 40);
+        const now = new Date();
+        const timestamp = now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + "_" + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        
+        link.download = `${safeName}_tr_${currentTemplate}_${timestamp}.jpg`;
+        link.href = dataUrl;
+        link.click();
+        updateStatus("Success! Exported graphic delivered to downloads.");
+      } catch (err) {
+        console.error(err);
+        updateStatus("Export Error: Chrome prevented the image download. (Canvas Tainted)", true);
+      }
     });
 
     function loadImage(url) {
@@ -352,7 +486,7 @@
         const img = new Image();
         img.crossOrigin = "anonymous"; 
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error("Asset fetch failed"));
+        img.onerror = () => reject(new Error("Asset fetch failed for: " + url));
         img.src = url;
       });
     }
