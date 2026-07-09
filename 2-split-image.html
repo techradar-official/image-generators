@@ -14,6 +14,28 @@
             align-items: center;
             padding: 20px;
         }
+        
+        /* New Size Toggle Container */
+        .size-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 900px;
+            box-sizing: border-box;
+        }
+        .size-toggle-container button {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+
         .controls-container {
             display: flex;
             gap: 20px;
@@ -25,6 +47,7 @@
             width: 100%;
             max-width: 900px;
             justify-content: space-between;
+            box-sizing: border-box;
         }
         .control-group {
             display: flex;
@@ -70,7 +93,7 @@
         button:hover { background-color: #004494; }
         .reset-btn { background-color: #6c757d; }
         .reset-btn:hover { background-color: #5a6268; }
-        .export-btn { background-color: #28a745; font-size: 1.1em; padding: 12px 24px; margin-top: 20px;}
+        .export-btn { background-color: #28a745; font-size: 1.1em; padding: 12px 24px; margin-top: 20px; width: auto;}
         .export-btn:hover { background-color: #218838; }
         
         #canvas-container {
@@ -80,8 +103,9 @@
             overflow: hidden;
             background: #ddd;
             width: 100%;
-            max-width: 800px;
-            aspect-ratio: 16 / 9;
+            max-width: 900px;
+            /* Aspect ratio is now controlled dynamically via Javascript */
+            transition: aspect-ratio 0.3s ease; 
         }
         canvas {
             display: block;
@@ -95,7 +119,13 @@
 </head>
 <body>
 
-    <h2>1920x1080 Image Splitter</h2>
+    <h2 id="mainTitle">Dual Image Splitter</h2>
+
+    <div class="size-toggle-container">
+        <span style="font-weight: bold; font-size: 1.1em;">Canvas Size:</span>
+        <button id="btn1920" style="background-color: #0056b3;">Standard (1920 x 1080)</button>
+        <button id="btn2520" style="background-color: #6c757d;">Ultrawide (2520 x 1080)</button>
+    </div>
 
     <div class="controls-container">
         <div class="control-group" id="left-controls">
@@ -134,7 +164,7 @@
         </div>
     </div>
 
-    <div id="canvas-container">
+    <div id="canvas-container" style="aspect-ratio: 16 / 9;">
         <canvas id="splitCanvas" width="1920" height="1080"></canvas>
     </div>
 
@@ -148,12 +178,14 @@
     <script>
         const canvas = document.getElementById('splitCanvas');
         const ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvas-container');
 
         let imgLeft = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
         let imgRight = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
         
         let lineDirection = 'tl-br'; 
         let nextPasteTarget = 'left';
+        let canvasMode = '1920';
 
         imgLeft.img.crossOrigin = "Anonymous";
         imgRight.img.crossOrigin = "Anonymous";
@@ -162,18 +194,56 @@
         let startX, startY;
         let activeSide = null;
         const SNAP_THRESHOLD = 20;
+        
+        // This constant ensures the line's exact horizontal spread remains identical regardless of width
+        const HALF_LINE_SPREAD = 192; 
+
+        // --- SIZE TOGGLE LOGIC ---
+        function updateCanvasSize(mode) {
+            canvasMode = mode;
+            if (mode === '1920') {
+                canvas.width = 1920;
+                canvas.height = 1080;
+                document.getElementById('btn1920').style.backgroundColor = '#0056b3';
+                document.getElementById('btn2520').style.backgroundColor = '#6c757d';
+                canvasContainer.style.aspectRatio = "16 / 9";
+            } else {
+                canvas.width = 2520;
+                canvas.height = 1080;
+                document.getElementById('btn1920').style.backgroundColor = '#6c757d';
+                document.getElementById('btn2520').style.backgroundColor = '#0056b3';
+                canvasContainer.style.aspectRatio = "21 / 9";
+            }
+
+            // Recenter images when switching sizes
+            if(imgLeft.loaded) {
+                imgLeft.x = canvas.width / 2; imgLeft.y = canvas.height / 2;
+                imgLeft.trueX = canvas.width / 2; imgLeft.trueY = canvas.height / 2;
+            }
+            if(imgRight.loaded) {
+                imgRight.x = canvas.width / 2; imgRight.y = canvas.height / 2;
+                imgRight.trueX = canvas.width / 2; imgRight.trueY = canvas.height / 2;
+            }
+            draw();
+        }
+
+        document.getElementById('btn1920').addEventListener('click', () => updateCanvasSize('1920'));
+        document.getElementById('btn2520').addEventListener('click', () => updateCanvasSize('2520'));
 
         // Render the canvas
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            const centerX = canvas.width / 2;
             let topSplitX, bottomSplitX;
+            
+            // Replaced the fixed percentage math with exact, constant offset math
             if (lineDirection === 'tl-br') {
-                topSplitX = canvas.width * 0.4;
-                bottomSplitX = canvas.width * 0.6;
+                topSplitX = centerX - HALF_LINE_SPREAD;
+                bottomSplitX = centerX + HALF_LINE_SPREAD;
             } else {
-                topSplitX = canvas.width * 0.6;
-                bottomSplitX = canvas.width * 0.4;
+                topSplitX = centerX + HALF_LINE_SPREAD;
+                bottomSplitX = centerX - HALF_LINE_SPREAD;
             }
 
             // --- DRAW LEFT SIDE MASK ---
@@ -279,13 +349,12 @@
                 }
 
                 if (blob) {
-                    e.preventDefault(); // Stop standard input box pasting behavior for images
+                    e.preventDefault(); 
                     const url = URL.createObjectURL(blob);
                     
                     let targetSide = nextPasteTarget;
                     const activeEl = document.activeElement;
 
-                    // Override default queue if user clicked inside a specific control panel
                     if (activeEl) {
                         if (activeEl.closest('#left-controls')) {
                             targetSide = 'left';
@@ -307,14 +376,14 @@
             }
         });
 
-        // --- EVENT LISTENERS FOR INPUTS (Now update the paste queue) ---
+        // --- EVENT LISTENERS FOR INPUTS ---
         document.getElementById('urlLeft').addEventListener('change', (e) => {
             loadImage(e.target.value, imgLeft);
-            nextPasteTarget = 'right'; // Image manually loaded to left, prep right for paste
+            nextPasteTarget = 'right'; 
         });
         document.getElementById('urlRight').addEventListener('change', (e) => {
             loadImage(e.target.value, imgRight);
-            nextPasteTarget = 'left'; // Image manually loaded to right, prep left for paste
+            nextPasteTarget = 'left'; 
         });
         
         document.getElementById('fileLeft').addEventListener('change', (e) => {
@@ -344,7 +413,6 @@
         });
 
         document.getElementById('btnSwapImg').addEventListener('click', () => {
-            // Swap references and all state values perfectly
             const tempImg = imgLeft.img;
             const tempLoaded = imgLeft.loaded;
             const tempX = imgLeft.x;
@@ -372,7 +440,6 @@
             imgRight.scale = tempScale;
             imgRight.rotation = tempRot;
 
-            // Immediately reflect swapped values in the UI sliders
             document.getElementById('scaleLeft').value = imgLeft.scale;
             document.getElementById('rotLeft').value = imgLeft.rotation;
             document.getElementById('scaleRight').value = imgRight.scale;
@@ -384,7 +451,7 @@
         document.getElementById('btnDownload').addEventListener('click', () => {
             try {
                 const link = document.createElement('a');
-                link.download = 'split-image.jpg';
+                link.download = `split-image-${canvasMode}.jpg`;
                 link.href = canvas.toDataURL('image/jpeg', 0.95);
                 link.click();
             } catch (err) {
@@ -398,13 +465,16 @@
             const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
             const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
 
+            const cx = canvas.width / 2;
             let x1, y1, x2, y2;
+            
+            // Replaced the collision math variables to use the exact center-math
             if (lineDirection === 'tl-br') {
-                x1 = canvas.width * 0.4; y1 = 0;
-                x2 = canvas.width * 0.6; y2 = canvas.height;
+                x1 = cx - HALF_LINE_SPREAD; y1 = 0;
+                x2 = cx + HALF_LINE_SPREAD; y2 = canvas.height;
             } else {
-                x1 = canvas.width * 0.6; y1 = 0;
-                x2 = canvas.width * 0.4; y2 = canvas.height;
+                x1 = cx + HALF_LINE_SPREAD; y1 = 0;
+                x2 = cx - HALF_LINE_SPREAD; y2 = canvas.height;
             }
             
             const m = (y2 - y1) / (x2 - x1);
