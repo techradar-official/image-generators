@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1920x1080 3-Image Splitter</title>
+    <title>3-Image Splitter</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -14,6 +14,28 @@
             align-items: center;
             padding: 20px;
         }
+        
+        /* Size Toggle Container */
+        .size-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1100px;
+            box-sizing: border-box;
+        }
+        .size-toggle-container button {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+
         .controls-container {
             display: flex;
             gap: 15px;
@@ -23,8 +45,9 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 1100px; /* Widened to accommodate 3 panels smoothly */
+            max-width: 1100px; 
             justify-content: space-between;
+            box-sizing: border-box;
         }
         .control-group {
             display: flex;
@@ -85,6 +108,7 @@
             width: 100%;
             max-width: 900px;
             aspect-ratio: 16 / 9;
+            transition: aspect-ratio 0.3s ease; 
         }
         canvas {
             display: block;
@@ -98,12 +122,18 @@
 </head>
 <body>
 
-    <h2>1920x1080 3-Image Splitter</h2>
+    <h2 id="mainTitle">3-Image Splitter</h2>
+
+    <div class="size-toggle-container">
+        <span style="font-weight: bold; font-size: 1.1em;">Canvas Size:</span>
+        <button id="btn1920" style="background-color: #0056b3;">Standard 16:9 (1920 x 1080)</button>
+        <button id="btn3000" style="background-color: #6c757d;">Ultrawide 21:9 (3000 x 1286)</button>
+    </div>
 
     <div class="controls-container">
         <div class="control-group" id="left-controls">
             <h3>Left Image</h3>
-            <input type="text" id="urlLeft" placeholder="Paste URL...">
+            <input type="text" id="urlLeft" placeholder="URL or Cmd+V...">
             <input type="file" id="fileLeft" accept="image/*">
             <div class="slider-group">
                 <label>Scale:</label>
@@ -118,7 +148,7 @@
 
         <div class="control-group" id="mid-controls">
             <h3>Middle Image</h3>
-            <input type="text" id="urlMid" placeholder="Paste URL...">
+            <input type="text" id="urlMid" placeholder="URL or Cmd+V...">
             <input type="file" id="fileMid" accept="image/*">
             <div class="slider-group">
                 <label>Scale:</label>
@@ -138,7 +168,7 @@
 
         <div class="control-group" id="right-controls">
             <h3>Right Image</h3>
-            <input type="text" id="urlRight" placeholder="Paste URL...">
+            <input type="text" id="urlRight" placeholder="URL or Cmd+V...">
             <input type="file" id="fileRight" accept="image/*">
             <div class="slider-group">
                 <label>Scale:</label>
@@ -166,25 +196,52 @@
     <script>
         const canvas = document.getElementById('splitCanvas');
         const ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvas-container');
 
-        // Added 'trueX' and 'trueY' trackers to prevent snapping from trapping the image
-        let imgLeft = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
-        let imgMid = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
-        let imgRight = { img: new Image(), x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        let imgLeft = { img: null, x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        let imgMid = { img: null, x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
+        let imgRight = { img: null, x: 0, y: 0, trueX: 0, trueY: 0, scale: 1, rotation: 0, loaded: false };
         
-        let lineDirection = 'style1'; // 'style1' ( \ / ) or 'style2' ( / \ )
+        let lineDirection = 'style1'; 
         let nextPasteTarget = 'left';
-
-        imgLeft.img.crossOrigin = "Anonymous";
-        imgMid.img.crossOrigin = "Anonymous";
-        imgRight.img.crossOrigin = "Anonymous";
+        let canvasMode = '1920';
 
         let isDragging = false;
         let startX, startY;
         let activeSide = null;
         const SNAP_THRESHOLD = 20;
 
-        // Render the canvas
+        // --- SIZE TOGGLE LOGIC ---
+        function updateCanvasSize(mode) {
+            canvasMode = mode;
+            if (mode === '1920') {
+                canvas.width = 1920;
+                canvas.height = 1080;
+                document.getElementById('btn1920').style.backgroundColor = '#0056b3';
+                document.getElementById('btn3000').style.backgroundColor = '#6c757d';
+                canvasContainer.style.aspectRatio = "16 / 9";
+            } else {
+                canvas.width = 3000;
+                canvas.height = 1286;
+                document.getElementById('btn1920').style.backgroundColor = '#6c757d';
+                document.getElementById('btn3000').style.backgroundColor = '#0056b3';
+                canvasContainer.style.aspectRatio = "3000 / 1286";
+            }
+
+            const sides = [imgLeft, imgMid, imgRight];
+            sides.forEach(imgObj => {
+                if(imgObj.loaded) {
+                    imgObj.x = canvas.width / 2; imgObj.y = canvas.height / 2;
+                    imgObj.trueX = canvas.width / 2; imgObj.trueY = canvas.height / 2;
+                }
+            });
+            draw();
+        }
+
+        document.getElementById('btn1920').addEventListener('click', () => updateCanvasSize('1920'));
+        document.getElementById('btn3000').addEventListener('click', () => updateCanvasSize('3000'));
+
+        // --- RENDERING ENGINE ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -192,16 +249,14 @@
             const h = canvas.height;
             let topL, botL, topR, botR;
             
-            // Define wedge shapes
             if (lineDirection === 'style1') {
-                topL = w * 0.3; botL = w * 0.4;
-                topR = w * 0.7; botR = w * 0.6;
+                topL = w * 0.275; botL = w * 0.375;
+                topR = w * 0.725; botR = w * 0.625;
             } else {
-                topL = w * 0.4; botL = w * 0.3;
-                topR = w * 0.6; botR = w * 0.7;
+                topL = w * 0.375; botL = w * 0.275;
+                topR = w * 0.625; botR = w * 0.725;
             }
 
-            // Helper to draw a masked image
             function drawMasked(imgObj, maskPath, fallbackColor) {
                 ctx.save();
                 ctx.beginPath();
@@ -209,7 +264,7 @@
                 ctx.closePath();
                 ctx.clip(); 
 
-                if (imgObj.loaded) {
+                if (imgObj.loaded && imgObj.img) {
                     ctx.translate(imgObj.x, imgObj.y);
                     ctx.rotate(imgObj.rotation * Math.PI / 180);
                     ctx.scale(imgObj.scale, imgObj.scale);
@@ -221,7 +276,6 @@
                 ctx.restore();
             }
 
-            // --- DRAW MASKS ---
             drawMasked(imgLeft, () => {
                 ctx.moveTo(0, 0); ctx.lineTo(topL, 0); ctx.lineTo(botL, h); ctx.lineTo(0, h);
             }, '#eeeeee');
@@ -234,29 +288,35 @@
                 ctx.moveTo(topR, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(botR, h);
             }, '#cccccc');
 
-            // --- DRAW THICK WHITE SPLIT LINES WITH OFF-CANVAS CAPS ---
             const extY = 100;
             let extXL = (extY / h) * (botL - topL);
             let extXR = (extY / h) * (botR - topR);
 
             ctx.strokeStyle = '#ffffff'; 
-            ctx.lineWidth = 20; // 20px per request
+            ctx.lineWidth = 20 * (w / 1920); 
 
-            // Left Line
             ctx.beginPath();
             ctx.moveTo(topL - extXL, -extY); 
             ctx.lineTo(botL + extXL, h + extY); 
             ctx.stroke();
 
-            // Right Line
             ctx.beginPath();
             ctx.moveTo(topR - extXR, -extY); 
             ctx.lineTo(botR + extXR, h + extY); 
             ctx.stroke();
         }
 
+        // --- HARDENED IMAGE PIPELINE ---
         function loadImage(source, sideObj, callback) {
-            sideObj.img.onload = () => {
+            const newImg = new Image();
+            
+            // Dynamic CORS assignment prevents Chrome from blocking local blob/file pastes
+            if (source.startsWith('http://') || source.startsWith('https://')) {
+                newImg.crossOrigin = "anonymous";
+            }
+            
+            newImg.onload = () => {
+                sideObj.img = newImg;
                 sideObj.loaded = true;
                 sideObj.x = canvas.width / 2;
                 sideObj.y = canvas.height / 2;
@@ -267,10 +327,12 @@
                 draw();
                 if (callback) callback();
             };
-            sideObj.img.onerror = () => {
-                alert("Could not load image. It might be blocked by the website's security (CORS). Try saving the image to your computer and uploading it instead.");
-            }
-            sideObj.img.src = source;
+            
+            newImg.onerror = () => {
+                alert("Security Error: Chrome blocked the image URL. Try saving it to your computer and using the 'Choose File' button instead.");
+            };
+            
+            newImg.src = source;
         }
 
         function resetSide(sideObj, scaleId, rotId) {
@@ -310,10 +372,14 @@
                     let targetSide = nextPasteTarget;
                     const activeEl = document.activeElement;
 
-                    if (activeEl) {
-                        if (activeEl.closest('#left-controls')) targetSide = 'left';
-                        else if (activeEl.closest('#mid-controls')) targetSide = 'mid';
-                        else if (activeEl.closest('#right-controls')) targetSide = 'right';
+                    // Extremely robust targeting: check clicked panels, then auto-fill empties
+                    if (activeEl && activeEl.closest('#left-controls')) targetSide = 'left';
+                    else if (activeEl && activeEl.closest('#mid-controls')) targetSide = 'mid';
+                    else if (activeEl && activeEl.closest('#right-controls')) targetSide = 'right';
+                    else {
+                        if (!imgLeft.loaded) targetSide = 'left';
+                        else if (!imgMid.loaded) targetSide = 'mid';
+                        else if (!imgRight.loaded) targetSide = 'right';
                     }
 
                     if (targetSide === 'left') {
@@ -340,9 +406,13 @@
         ];
 
         sides.forEach(s => {
-            document.getElementById(`url${s.id}`).addEventListener('change', (e) => {
-                loadImage(e.target.value, s.obj);
-                nextPasteTarget = s.nextTarget;
+            document.getElementById(`url${s.id}`).addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                if (val.startsWith('http')) {
+                    loadImage(val, s.obj);
+                    nextPasteTarget = s.nextTarget;
+                    setTimeout(() => { e.target.value = ''; }, 1000); // clear UI helper
+                }
             });
             document.getElementById(`file${s.id}`).addEventListener('change', (e) => {
                 if (e.target.files[0]) {
@@ -362,32 +432,27 @@
         });
 
         document.getElementById('btnShiftImg').addEventListener('click', () => {
-            // Shifts all images to the right (Left -> Mid, Mid -> Right, Right -> Left)
             const tempImg = imgRight.img;
             const tempLoaded = imgRight.loaded;
             const tempX = imgRight.x; const tempY = imgRight.y;
             const tempTrueX = imgRight.trueX; const tempTrueY = imgRight.trueY;
             const tempScale = imgRight.scale; const tempRot = imgRight.rotation;
 
-            // Move Mid to Right
             imgRight.img = imgMid.img; imgRight.loaded = imgMid.loaded;
             imgRight.x = imgMid.x; imgRight.y = imgMid.y;
             imgRight.trueX = imgMid.trueX; imgRight.trueY = imgMid.trueY;
             imgRight.scale = imgMid.scale; imgRight.rotation = imgMid.rotation;
 
-            // Move Left to Mid
             imgMid.img = imgLeft.img; imgMid.loaded = imgLeft.loaded;
             imgMid.x = imgLeft.x; imgMid.y = imgLeft.y;
             imgMid.trueX = imgLeft.trueX; imgMid.trueY = imgLeft.trueY;
             imgMid.scale = imgLeft.scale; imgMid.rotation = imgLeft.rotation;
 
-            // Move Temp(Right) to Left
             imgLeft.img = tempImg; imgLeft.loaded = tempLoaded;
             imgLeft.x = tempX; imgLeft.y = tempY;
             imgLeft.trueX = tempTrueX; imgLeft.trueY = tempTrueY;
             imgLeft.scale = tempScale; imgLeft.rotation = tempRot;
 
-            // Update UI
             sides.forEach(s => {
                 document.getElementById(`scale${s.id}`).value = s.obj.scale;
                 document.getElementById(`rot${s.id}`).value = s.obj.rotation;
@@ -399,7 +464,7 @@
         document.getElementById('btnDownload').addEventListener('click', () => {
             try {
                 const link = document.createElement('a');
-                link.download = '3-split-image.jpg';
+                link.download = `3-split-image-${canvasMode}.jpg`;
                 link.href = canvas.toDataURL('image/jpeg', 0.95);
                 link.click();
             } catch (err) {
@@ -414,9 +479,9 @@
             let topL, botL, topR, botR;
             
             if (lineDirection === 'style1') { 
-                topL=0.3; botL=0.4; topR=0.7; botR=0.6; 
+                topL = 0.275; botL = 0.375; topR = 0.725; botR = 0.625; 
             } else { 
-                topL=0.4; botL=0.3; topR=0.6; botR=0.7; 
+                topL = 0.375; botL = 0.275; topR = 0.625; botR = 0.725; 
             }
             
             const expectedXL = (topL * w) + ((mouseY - 0) * ((botL * w) - (topL * w)) / h);
