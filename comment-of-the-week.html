@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Generator Tools</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f2f5; display: flex; gap: 40px; flex-wrap: wrap; }
+        .tool-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); flex: 1; min-width: 400px; max-width: 600px; }
+        h2 { margin-top: 0; font-size: 20px; color: #333; }
+        .controls { margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+        input[type="text"], input[type="file"], textarea { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        textarea { resize: vertical; height: 100px; }
+        button { padding: 10px 15px; font-size: 14px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        .canvas-wrapper { position: relative; width: 100%; padding-top: 125%; /* 1350/1080 aspect ratio */ background: #eee; overflow: hidden; border: 1px solid #ddd; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: top left; }
+        .hint { font-size: 12px; color: #666; }
+        .toggle-group { display: flex; gap: 10px; }
+        .toggle-group label { background: #eee; padding: 8px 12px; border-radius: 4px; cursor: pointer; border: 1px solid #ccc; font-size: 14px; flex: 1; text-align: center;}
+        .toggle-group input:checked + label { background: #007bff; color: white; border-color: #007bff; }
+        .toggle-group input { display: none; }
+        .flex-row { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- TOOL 1: Image Crop & Overlay -->
+    <div class="tool-container" id="tool1">
+        <h2>Tool 1: Image Cropper & Overlay</h2>
+        <div class="controls">
+            
+            <!-- Upload or Paste URL -->
+            <input type="file" id="t1-upload" accept="image/*">
+            <div class="flex-row">
+                <input type="text" id="t1-url" placeholder="Or paste image URL here...">
+                <button onclick="loadImageUrl()">Load URL</button>
+            </div>
+            <span class="hint">Or paste an image anywhere on the page (Ctrl+V / Cmd+V). Drag canvas to pan.</span>
+            
+            <!-- Zoom Slider -->
+            <div class="flex-row">
+                <label for="t1-zoom" style="font-size: 14px; font-weight: bold;">Zoom:</label>
+                <input type="range" id="t1-zoom" min="0.1" max="5" step="0.01" value="1" oninput="updateZoom()">
+            </div>
+
+            <!-- Credit Text & Color Toggle -->
+            <div class="flex-row">
+                <input type="text" id="t1-credit" value="Image Credit" placeholder="Image Credit" oninput="drawTool1()" style="flex: 2;">
+                <div class="toggle-group" style="flex: 1;">
+                    <input type="radio" id="credit-white" name="t1-color" value="white" checked onchange="drawTool1()">
+                    <label for="credit-white">White</label>
+                    <input type="radio" id="credit-black" name="t1-color" value="black" onchange="drawTool1()">
+                    <label for="credit-black">Black</label>
+                </div>
+            </div>
+
+            <button onclick="downloadImage('canvas1', 'Image-Overlay.jpg')">Download Tool 1 JPG</button>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="canvas1" width="1080" height="1350"></canvas>
+        </div>
+    </div>
+
+    <!-- TOOL 2: Text on Background -->
+    <div class="tool-container" id="tool2">
+        <h2>Tool 2: Text on Background</h2>
+        <div class="controls">
+            <div class="toggle-group">
+                <input type="radio" id="bg-light" name="t2-bg" value="light" checked onchange="updateTool2Bg()">
+                <label for="bg-light">Light Background</label>
+                
+                <input type="radio" id="bg-dark" name="t2-bg" value="dark" onchange="updateTool2Bg()">
+                <label for="bg-dark">Dark Background</label>
+            </div>
+            <textarea id="t2-text" placeholder="Enter your text here..." oninput="drawTool2()">Your Headline Text</textarea>
+            <button onclick="downloadImage('canvas2', 'Text-Graphic.jpg')">Download Tool 2 JPG</button>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="canvas2" width="1080" height="1350"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL CONSTANTS ---
+        const CANVAS_WIDTH = 1080;
+        const CANVAS_HEIGHT = 1350;
+
+        // --- PRELOAD ASSETS ---
+        const loadImg = (url) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = url;
+            return img;
+        };
+
+        const t1Overlay = loadImg('https://cdn.mos.cms.futurecdn.net/FM3aXZeKeDHZ2YErCGw5Y3.png');
+        const t2BgLight = loadImg('https://cdn.mos.cms.futurecdn.net/DHqbt4MTydiWHEjKZT4QRE.png');
+        const t2BgDark = loadImg('https://cdn.mos.cms.futurecdn.net/dnTJfHATiYoe9p6VQc5i4Q.png');
+
+        t1Overlay.onload = drawTool1;
+        t2BgLight.onload = drawTool2;
+        t2BgDark.onload = drawTool2;
+
+        // --- TOOL 1 LOGIC ---
+        const canvas1 = document.getElementById('canvas1');
+        const ctx1 = canvas1.getContext('2d');
+        
+        let t1UserImg = null;
+        let t1BaseScale = 1; // Stores the scale needed to perfectly fit the height
+        let t1State = { scale: 1, offsetX: 0, offsetY: 0, isDragging: false, startX: 0, startY: 0 };
+
+        function drawTool1() {
+            ctx1.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx1.fillStyle = "#ffffff";
+            ctx1.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Draw User Image with Pan/Zoom
+            if (t1UserImg) {
+                ctx1.save();
+                ctx1.translate(t1State.offsetX, t1State.offsetY);
+                ctx1.scale(t1State.scale, t1State.scale);
+                ctx1.drawImage(t1UserImg, 0, 0);
+                ctx1.restore();
+            }
+
+            // Draw Overlay
+            if (t1Overlay.complete) {
+                ctx1.drawImage(t1Overlay, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
+
+            // Draw Credit Text
+            const creditText = document.getElementById('t1-credit').value;
+            const creditColor = document.querySelector('input[name="t1-color"]:checked').value;
+            
+            ctx1.font = 'bold 40px Arial';
+            ctx1.fillStyle = creditColor === 'white' ? '#ffffff' : '#000000';
+            ctx1.textAlign = 'right';
+            ctx1.textBaseline = 'middle';
+            ctx1.fillText(creditText, 1003.30, 1276.41);
+        }
+
+        // Shared function to set up the image once loaded
+        function initializeTool1Image(img) {
+            t1UserImg = img;
+            // Calculate base scale to fit canvas height
+            t1BaseScale = CANVAS_HEIGHT / img.height;
+            t1State.scale = t1BaseScale;
+            
+            // Reset the zoom slider to 1 (default)
+            document.getElementById('t1-zoom').value = 1;
+            
+            // Center horizontally
+            t1State.offsetX = (CANVAS_WIDTH - (img.width * t1State.scale)) / 2;
+            t1State.offsetY = 0;
+            drawTool1();
+        }
+
+        // Handle File Upload Tool 1
+        document.getElementById('t1-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleImageFile(file);
+        });
+
+        // Handle Image URL Ingestion Tool 1
+        function loadImageUrl() {
+            const url = document.getElementById('t1-url').value;
+            if (!url) return;
+            
+            const img = new Image();
+            img.crossOrigin = "anonymous"; // Required for downloading canvas later
+            img.onload = () => initializeTool1Image(img);
+            img.onerror = () => {
+                alert("Could not load image from URL. The image server might be blocking cross-origin access (CORS). Try saving the image to your computer and uploading it instead.");
+            };
+            img.src = url;
+        }
+
+        // Handle Paste (Global)
+        window.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    handleImageFile(blob);
+                    break;
+                }
+            }
+        });
+
+        function handleImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => initializeTool1Image(img);
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Handle Zoom Slider
+        function updateZoom() {
+            if (!t1UserImg) return;
+            const zoomMultiplier = parseFloat(document.getElementById('t1-zoom').value);
+            // Multiply the slider value by our base fit-to-height scale
+            t1State.scale = t1BaseScale * zoomMultiplier;
+            drawTool1();
+        }
+
+        // Pan Interactions for Tool 1
+        canvas1.addEventListener('mousedown', (e) => {
+            t1State.isDragging = true;
+            t1State.startX = e.clientX - t1State.offsetX;
+            t1State.startY = e.clientY - t1State.offsetY;
+        });
+
+        window.addEventListener('mouseup', () => t1State.isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if (t1State.isDragging && t1UserImg) {
+                t1State.offsetX = e.clientX - t1State.startX;
+                t1State.offsetY = e.clientY - t1State.startY;
+                drawTool1();
+            }
+        });
+
+
+        // --- TOOL 2 LOGIC ---
+        const canvas2 = document.getElementById('canvas2');
+        const ctx2 = canvas2.getContext('2d');
+        let currentT2Bg = t2BgLight;
+
+        function updateTool2Bg() {
+            const bgType = document.querySelector('input[name="t2-bg"]:checked').value;
+            currentT2Bg = bgType === 'light' ? t2BgLight : t2BgDark;
+            drawTool2();
+        }
+
+        function drawTool2() {
+            ctx2.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            if (currentT2Bg.complete && currentT2Bg.naturalWidth !== 0) {
+                ctx2.drawImage(currentT2Bg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
+
+            const text = document.getElementById('t2-text').value;
+            
+            const x = 145;
+            const y = 457;
+            const maxWidth = 937 - 145; 
+            const lineHeight = 70; 
+            
+            ctx2.font = 'bold 60px Arial';
+            ctx2.fillStyle = '#000000';
+            ctx2.textAlign = 'left';
+            ctx2.textBaseline = 'top';
+
+            wrapText(ctx2, text, x, y, maxWidth, lineHeight);
+        }
+
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const paragraphs = text.split('\n');
+            let currentY = y;
+
+            for (let i = 0; i < paragraphs.length; i++) {
+                const words = paragraphs[i].split(' ');
+                let line = '';
+
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = context.measureText(testLine);
+                    const testWidth = metrics.width;
+                    
+                    if (testWidth > maxWidth && n > 0) {
+                        context.fillText(line, x, currentY);
+                        line = words[n] + ' ';
+                        currentY += lineHeight;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                context.fillText(line, x, currentY);
+                currentY += lineHeight; 
+            }
+        }
+
+        // --- SHARED EXPORT LOGIC ---
+        function downloadImage(canvasId, filename) {
+            const targetCanvas = document.getElementById(canvasId);
+            const dataURL = targetCanvas.toDataURL('image/jpeg', 1.0);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataURL;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        setTimeout(() => {
+            drawTool1();
+            drawTool2();
+        }, 100);
+
+    </script>
+</body>
+</html>
