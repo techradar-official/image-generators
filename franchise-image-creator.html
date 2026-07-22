@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Franchise Image Creator</title>
+    <style>
+        :root {
+            --tr-blue: #152238;
+            --tr-cyan: #00d2ff;
+            --bg-color: #f4f6f8;
+            --panel-bg: #ffffff;
+            --border-color: #ddd;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .header h1 {
+            color: var(--tr-blue);
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 25px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Left Sidebar */
+        .left-sidebar {
+            width: 420px;
+            background: var(--panel-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        h2 { margin-top: 0; color: var(--tr-blue); }
+        
+        details {
+            margin-bottom: 15px;
+            background: #fff;
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--tr-blue);
+            cursor: pointer;
+            padding: 8px 0;
+            border-bottom: 2px solid var(--tr-blue);
+            margin-bottom: 10px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary::before {
+            content: '▶';
+            font-size: 0.8em;
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+
+        .logo-list { display: flex; flex-direction: column; gap: 8px; }
+        .logo-item {
+            display: grid;
+            grid-template-columns: 1fr 60px 60px;
+            gap: 10px;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .logo-title { font-size: 0.9em; font-weight: 500; }
+        .logo-btn {
+            background: #eee;
+            color: #333;
+            padding: 4px 8px;
+            font-size: 0.8em;
+            text-align: center;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .logo-btn.dark-btn { background: #333; color: white; }
+        .logo-btn.dark-btn:hover { background: #000; }
+        .logo-btn.light-btn { background: #fff; border: 1px solid #ccc; }
+        .logo-btn.light-btn:hover { background: #f0f0f0; }
+
+        /* Workspace */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+            overflow-y: auto;
+        }
+        
+        .canvas-container {
+            width: 100%;
+            max-width: 720px; 
+            flex-shrink: 0; 
+            aspect-ratio: 16 / 9; 
+            background: #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        canvas {
+            width: 100%;
+            height: auto; 
+            cursor: grab;
+            display: block;
+        }
+        canvas:active { cursor: grabbing; }
+        
+        .controls-card {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            max-width: 720px; 
+            width: 100%;
+            box-sizing: border-box; /* Forces padding to stay within the 720px limit */
+            flex-shrink: 0;
+        }
+
+        .instructions {
+            background: #e9f5ff;
+            border-left: 4px solid var(--tr-cyan);
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .control-group label { font-weight: 600; font-size: 0.9em; }
+        
+        .scale-controls {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        .scale-box {
+            flex: 1;
+            max-width: 250px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .btn-reset {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            color: #555;
+            font-size: 0.8em;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        .btn-reset:hover { background: #eee; }
+        
+        input[type="range"] { width: 100%; cursor: pointer; }
+        input[type="text"], input[type="file"] {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background: var(--tr-blue);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1e3250; }
+        
+        .btn-download { background: #28a745; width: 100%; padding: 15px; font-size: 1.1em; }
+        .btn-download:hover { background: #218838; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Franchise Image Creator</h1>
+    </div>
+
+    <div class="main-container">
+        
+        <!-- Left Sidebar: Logos -->
+        <div class="left-sidebar">
+            <h2>Select Logo</h2>
+            
+            <details>
+                <summary>General</summary>
+                <div id="general-logos" class="logo-list"></div>
+            </details>
+
+            <details>
+                <summary>Channel Specific</summary>
+                <div id="channel-logos" class="logo-list"></div>
+            </details>
+        </div>
+
+        <!-- Right Workspace: Canvas & Controls -->
+        <div class="workspace">
+            <div class="canvas-container">
+                <canvas id="mainCanvas" width="1920" height="1080"></canvas>
+            </div>
+            
+            <div class="controls-card">
+                <div class="instructions">
+                    <strong>How to use:</strong> Paste an image directly onto this page (Ctrl+V / Cmd+V), supply a URL, or upload a file. <strong>Click and drag</strong> directly on the canvas to reposition the background image or the logo. Use the sliders to resize elements. The background image will snap to the edges.
+                </div>
+
+                <div class="control-group">
+                    <label>Add Background Image</label>
+                    <div style="display: flex; gap: 10px; max-width: 600px;">
+                        <input type="file" id="fileUpload" accept="image/*">
+                        <input type="text" id="urlInput" placeholder="Paste Image URL here...">
+                        <button id="loadUrlBtn">Load</button>
+                    </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
+                
+                <div class="scale-controls">
+                    <div class="scale-box">
+                        <div class="slider-header">
+                            <label>Background Scale</label>
+                            <button id="resetBgBtn" class="btn-reset">↺ Reset</button>
+                        </div>
+                        <input type="range" id="bgScaleSlider" min="0.1" max="3" step="0.01" value="1">
+                    </div>
+                    <div class="scale-box">
+                        <div class="slider-header">
+                            <label>Logo Size Override</label>
+                            <button id="resetLogoBtn" class="btn-reset">↺ Reset</button>
+                        </div>
+                        <input type="range" id="logoScaleSlider" min="0.1" max="3" step="0.01" value="1">
+                    </div>
+                </div>
+
+                <button class="btn-download" id="downloadBtn">Download JPEG</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const logoData = [
+    { title: "$20 Challenge", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/AnMaCsvZQE7KZRMy6wVT4P.png", light: "https://cdn.mos.cms.futurecdn.net/jxfBgFrBLto7KSA3abhG3P.png" },
+    { title: "Antenna", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/bDnS6TQqJ5DY3MWLrazw4P.png", light: "https://cdn.mos.cms.futurecdn.net/bsSUzgajtPqsE2H7tCHr3P.png" },
+    { title: "Cheat Sheet", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/WNZiyyBSKKJXtcf9ARyZ5P.png", light: "https://cdn.mos.cms.futurecdn.net/2GypFiYpFC8H77hdNw3F5P.png" },
+    { title: "Game Changer", section: "General", dark: null, light: "https://cdn.mos.cms.futurecdn.net/k4fK6rCeKVnxVW89M2KZ6P.png" },
+    { title: "Hidden Features", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/g3Wfta32xGiqoSHWuFwb7P.png", light: "https://cdn.mos.cms.futurecdn.net/ykf5Th3nuJWGfzkLYb5D7P.png" },
+    { title: "Homescreen Heroes", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/fUZ2c7DUuRPoNsK4SCiH9P.png", light: "https://cdn.mos.cms.futurecdn.net/sB5zoLTFMuWArSUje9G98P.png" },
+    { title: "ICYMI", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/VSUVYqLPGZTXzNFqQbPL9P.png", light: "https://cdn.mos.cms.futurecdn.net/5V6HMXgqReYMHXjPtPJT8P.png" },
+    { title: "Internet Gold", section: "General", dark: null, light: "https://cdn.mos.cms.futurecdn.net/bWpBdEpKzUowCSiBUzHP9P.png" },
+    { title: "Money No Object $", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/cqVaJsNQzuMEG9awXCvfAP.png", light: "https://cdn.mos.cms.futurecdn.net/9XYVptAq4Xs2cYyrfAor9P.png" },
+    { title: "Money No Object £", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/Cwzv8CiurdnZ8YQ6gZpDCP.png", light: "https://cdn.mos.cms.futurecdn.net/B69qDhkvKWeLm6Bv2asMAP.png" },
+    { title: "Myth Buster", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/4MVGodgtwuGbxGvjBvmmBP.png", light: "https://cdn.mos.cms.futurecdn.net/3CZj4SVjRA378ki9GsNBBP.png" },
+    { title: "Next Big Thing?", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/6gtffyKSiUJs3w3eBiFXDP.png", light: "https://cdn.mos.cms.futurecdn.net/S5oGHCxFFt387zL6CiFmCP.png" },
+    { title: "Origin Story", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/AxcMzayBv5dCKewazZ6xDP.png", light: "https://cdn.mos.cms.futurecdn.net/BFHGZKwkdtFmeY8wkXdeDP.png" },
+    { title: "Reviews Recap", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/4hBkPwMBGBEc9fUvbBqjFP.png", light: null },
+    { title: "Scam Alert", section: "General", dark: "https://cdn.mos.cms.futurecdn.net/dYh7Jb8JpjKtcuUB52Z4FP.png", light: "https://cdn.mos.cms.futurecdn.net/4BRMSrn2E4Xdv5htr5ifEP.png" },
+    { title: "Blu-ray Bounty", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/bEVAJ7vAXBPKXNyZZqNL6P.png", light: null },
+    { title: "From the Backlog", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/aT859sMD7Do7U7rhqgwNJP.png", light: null },
+    { title: "Under the Radar", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/s7xjnqLxAVj9TcR5WP5zLP.png", light: null },
+    { title: "Power On...", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/PeXSVMrpSyaiZotDiGAUEP.png", light: "https://cdn.mos.cms.futurecdn.net/6uhSnFSoHET2yaRrpGJAEP.png" },
+    { title: "Scream or Skip", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/FLaUg93CDCKELZ8NbMa2GP.png", light: null },
+    { title: "What Stars Watch", section: "Channel specific", dark: "https://cdn.mos.cms.futurecdn.net/nZtySy2YH8J84y2PtnPgGP.png", light: null }
+];
+
+const genContainer = document.getElementById('general-logos');
+const chanContainer = document.getElementById('channel-logos');
+
+logoData.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'logo-item';
+    
+    const title = document.createElement('div');
+    title.className = 'logo-title';
+    title.innerText = item.title;
+    row.appendChild(title);
+
+    if (item.dark) {
+        const dBtn = document.createElement('button');
+        dBtn.className = 'logo-btn dark-btn';
+        dBtn.innerText = 'Dark';
+        dBtn.onclick = () => loadLogo(item.dark);
+        row.appendChild(dBtn);
+    } else {
+        row.appendChild(document.createElement('div'));
+    }
+
+    if (item.light) {
+        const lBtn = document.createElement('button');
+        lBtn.className = 'logo-btn light-btn';
+        lBtn.innerText = 'Light';
+        lBtn.onclick = () => loadLogo(item.light);
+        row.appendChild(lBtn);
+    } else {
+        row.appendChild(document.createElement('div'));
+    }
+
+    if (item.section === "General") genContainer.appendChild(row);
+    else chanContainer.appendChild(row);
+});
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const bgScaleSlider = document.getElementById('bgScaleSlider');
+const logoScaleSlider = document.getElementById('logoScaleSlider');
+
+let bg = { img: null, x: 0, y: 0, baseScale: 1, userScale: 1 };
+let logo = { img: null, x: 0, y: 0, w: 0, h: 0, userScale: 1 };
+let oldLogoScale = 1; 
+
+const LOGO_DEFAULT_R = 1878;
+const LOGO_DEFAULT_Y = 36;
+const LOGO_DEFAULT_H = 228;
+const SNAP_TOLERANCE = 30;
+
+// Inputs & Listeners
+document.getElementById('fileUpload').addEventListener('change', handleFile);
+document.getElementById('loadUrlBtn').addEventListener('click', () => loadBgImage(document.getElementById('urlInput').value));
+window.addEventListener('paste', handlePaste);
+
+bgScaleSlider.addEventListener('input', (e) => { 
+    bg.userScale = parseFloat(e.target.value); 
+    draw(); 
+});
+
+logoScaleSlider.addEventListener('input', (e) => { 
+    let newScale = parseFloat(e.target.value); 
+    
+    let cx = logo.x + (logo.w * oldLogoScale) / 2;
+    let cy = logo.y + (logo.h * oldLogoScale) / 2;
+    
+    logo.x = cx - (logo.w * newScale) / 2;
+    logo.y = cy - (logo.h * newScale) / 2;
+    
+    logo.userScale = newScale;
+    oldLogoScale = newScale;
+    draw(); 
+});
+
+// Reset Buttons
+document.getElementById('resetBgBtn').addEventListener('click', () => {
+    if (bg.img) {
+        bg.userScale = 1;
+        bgScaleSlider.value = 1;
+        bg.x = (canvas.width - (bg.img.width * bg.baseScale)) / 2;
+        bg.y = (canvas.height - (bg.img.height * bg.baseScale)) / 2;
+        draw();
+    }
+});
+
+document.getElementById('resetLogoBtn').addEventListener('click', () => {
+    if (logo.img) {
+        logo.userScale = 1;
+        oldLogoScale = 1;
+        logoScaleSlider.value = 1;
+        logo.x = LOGO_DEFAULT_R - logo.w;
+        logo.y = LOGO_DEFAULT_Y;
+        draw();
+    }
+});
+
+function loadBgImage(src) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        bg.img = img;
+        bg.baseScale = Math.max(canvas.width / img.width, canvas.height / img.height);
+        bg.userScale = 1;
+        bgScaleSlider.value = 1;
+        bg.x = (canvas.width - (img.width * bg.baseScale)) / 2;
+        bg.y = (canvas.height - (img.height * bg.baseScale)) / 2;
+        draw();
+    };
+    img.src = src;
+}
+
+function loadLogo(src) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        logo.img = img;
+        logo.userScale = 1;
+        oldLogoScale = 1;
+        logoScaleSlider.value = 1;
+        
+        logo.h = LOGO_DEFAULT_H;
+        logo.w = (LOGO_DEFAULT_H / img.naturalHeight) * img.naturalWidth;
+        logo.x = LOGO_DEFAULT_R - logo.w;
+        logo.y = LOGO_DEFAULT_Y;
+        draw();
+    };
+    img.src = src;
+}
+
+function handleFile(e) {
+    if (e.target.files && e.target.files[0]) {
+        loadBgImage(URL.createObjectURL(e.target.files[0]));
+    }
+}
+
+function handlePaste(e) {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let index in items) {
+        const item = items[index];
+        if (item.kind === 'file' && item.type.includes('image')) {
+            const blob = item.getAsFile();
+            loadBgImage(URL.createObjectURL(blob));
+            return;
+        }
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (bg.img) {
+        const finalScale = bg.baseScale * bg.userScale;
+        const w = bg.img.width * finalScale;
+        const h = bg.img.height * finalScale;
+        ctx.drawImage(bg.img, bg.x, bg.y, w, h);
+    } else {
+        ctx.fillStyle = '#e9ecef';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#adb5bd';
+        ctx.font = '36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Paste or Upload Background Image Here', canvas.width/2, canvas.height/2);
+    }
+
+    if (logo.img) {
+        const w = logo.w * logo.userScale;
+        const h = logo.h * logo.userScale;
+        ctx.drawImage(logo.img, logo.x, logo.y, w, h);
+    }
+}
+
+// Interactivity / Dragging
+let isDragging = false;
+let dragTarget = null;
+let startX, startY;
+let initialObjX, initialObjY;
+
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+
+    if (logo.img) {
+        const lw = logo.w * logo.userScale;
+        const lh = logo.h * logo.userScale;
+        if (mouseX >= logo.x && mouseX <= logo.x + lw && mouseY >= logo.y && mouseY <= logo.y + lh) {
+            isDragging = true;
+            dragTarget = 'logo';
+            startX = mouseX; startY = mouseY;
+            initialObjX = logo.x; initialObjY = logo.y;
+            return;
+        }
+    }
+
+    if (bg.img) {
+        isDragging = true;
+        dragTarget = 'bg';
+        startX = mouseX; startY = mouseY;
+        initialObjX = bg.x; initialObjY = bg.y;
+    }
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+    
+    const dx = mouseX - startX;
+    const dy = mouseY - startY;
+
+    if (dragTarget === 'logo') {
+        logo.x = initialObjX + dx;
+        logo.y = initialObjY + dy;
+    } else if (dragTarget === 'bg') {
+        let newX = initialObjX + dx;
+        let newY = initialObjY + dy;
+        
+        const currentW = bg.img.width * bg.baseScale * bg.userScale;
+        const currentH = bg.img.height * bg.baseScale * bg.userScale;
+
+        if (Math.abs(newX) < SNAP_TOLERANCE) newX = 0;
+        if (Math.abs(canvas.width - (newX + currentW)) < SNAP_TOLERANCE) newX = canvas.width - currentW;
+        if (Math.abs(newY) < SNAP_TOLERANCE) newY = 0;
+        if (Math.abs(canvas.height - (newY + currentH)) < SNAP_TOLERANCE) newY = canvas.height - currentH;
+
+        bg.x = newX;
+        bg.y = newY;
+    }
+    draw();
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; dragTarget = null; });
+canvas.addEventListener('mouseleave', () => { isDragging = false; dragTarget = null; });
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+    try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const link = document.createElement('a');
+        link.download = 'Franchise_Image.jpg';
+        link.href = dataUrl;
+        link.click();
+    } catch (err) {
+        alert("Security Error: The browser locked the canvas. Download the image locally and upload it from your PC instead.");
+    }
+});
+
+draw();
+</script>
+</body>
+</html>
